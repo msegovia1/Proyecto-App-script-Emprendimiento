@@ -43,7 +43,7 @@ function apiBootstrap() {
     const user = usuarioActual_();
     let dashboard = null;
     if (puede_('REPORTE_VER')) {
-      const dbResp = apiDashboard();
+      const dbResp = apiDashboardIntegral(false);
       if (dbResp.ok) dashboard = dbResp.data;
     }
     const props = PropertiesService.getScriptProperties();

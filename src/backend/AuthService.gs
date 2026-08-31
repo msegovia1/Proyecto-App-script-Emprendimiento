@@ -2,6 +2,8 @@
 // SGE v2.1.0 - Ficha integral del emprendedor
 // Gestión de identidad, roles y control de acceso basado en permisos (RBAC)
 
+let _usuarioActualCache = null;
+
 /**
  * Obtiene el correo electrónico del usuario activo en la sesión.
  */
@@ -10,14 +12,16 @@ function emailActual_() {
 }
 
 /**
- * Recupera el registro del usuario activo verificando que se encuentre habilitado.
+ * Recupera el registro del usuario activo verificando que se encuentre habilitado con caché en memoria.
  */
 function usuarioActual_() {
+  if (_usuarioActualCache) return _usuarioActualCache;
   const email = emailActual_();
   exigir_(email, 'SIN_IDENTIDAD', 'No fue posible obtener el correo institucional.');
   const users = repoListar('USUARIOS', { filtro: { EMAIL: email }, incluirInactivos: true, limit: 10 });
   exigir_(users.length && String(users[0].ACTIVO).toUpperCase() !== 'NO', 'SIN_ACCESO', 'Usuario no autorizado.');
-  return users[0];
+  _usuarioActualCache = users[0];
+  return _usuarioActualCache;
 }
 
 /**

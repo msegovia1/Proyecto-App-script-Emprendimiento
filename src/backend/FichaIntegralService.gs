@@ -78,13 +78,24 @@ function apiListarFichasIntegrales(filtros) {
     const rels = repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }).filter(function(r) { return r.ESTADO_REGISTRO !== 'INACTIVO'; });
     const todosDocs = repoTodos('DOCUMENTOS', { incluirInactivos: true });
 
+    const relsPorPersona = {};
+    rels.forEach(function(r) { relsPorPersona[String(r.ID_PERSONA)] = r; });
+    const docsPorPersona = {};
+    const docsPorEmp = {};
+    todosDocs.forEach(function(d) {
+      if (d.TIPO_SUJETO === 'PERSONA') {
+        (docsPorPersona[String(d.ID_SUJETO)] = docsPorPersona[String(d.ID_SUJETO)] || []).push(d);
+      } else if (d.TIPO_SUJETO === 'EMPRENDIMIENTO') {
+        (docsPorEmp[String(d.ID_SUJETO)] = docsPorEmp[String(d.ID_SUJETO)] || []).push(d);
+      }
+    });
+
     let rows = personas.map(function(p) {
-      const rel = rels.find(function(r) { return String(r.ID_PERSONA) === String(p.ID_PERSONA); });
+      const rel = relsPorPersona[String(p.ID_PERSONA)];
       const e = rel ? emps[String(rel.ID_EMPRENDIMIENTO)] : null;
-      const docs = todosDocs.filter(function(d) {
-        return (d.TIPO_SUJETO === 'PERSONA' && String(d.ID_SUJETO) === String(p.ID_PERSONA)) ||
-               (e && d.TIPO_SUJETO === 'EMPRENDIMIENTO' && String(d.ID_SUJETO) === String(e.ID_EMPRENDIMIENTO));
-      });
+      const dPers = docsPorPersona[String(p.ID_PERSONA)] || [];
+      const dEmp = e ? (docsPorEmp[String(e.ID_EMPRENDIMIENTO)] || []) : [];
+      const docs = dPers.concat(dEmp);
       const res = resumenFichaIntegral_(p, e, docs);
       return {
         ID_PERSONA: p.ID_PERSONA,

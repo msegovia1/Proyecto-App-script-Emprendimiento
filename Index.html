@@ -966,6 +966,41 @@
     color: var(--navy);
   }
 
+  /* Validación de RUT y Alertas de Duplicados en Vivo */
+  .rut-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+  .rut-badge.valid {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+  .rut-badge.invalid {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+  .duplicate-warning-box {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-top: 8px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
   /* Responsive Media Queries */
   @media(max-width: 1050px) {
     .dashboard-grid { grid-template-columns: 1fr 1fr; }
@@ -1286,11 +1321,40 @@
     });
   }
 
-  async function renderInicio() {
+  function validarRutChileno(rutCompleto) {
+    if (!rutCompleto) return { valido: false, mensaje: '' };
+    const limpio = String(rutCompleto).replace(/[^0-9kK]/g, '').toUpperCase();
+    if (limpio.length < 8 || limpio.length > 9) return { valido: false, mensaje: 'RUT incompleto' };
+    const cuerpo = limpio.slice(0, -1);
+    const dv = limpio.slice(-1);
+    let suma = 0, multiplo = 2;
+    for (let i = cuerpo.length - 1; i >= 0; i--) {
+      suma += Number(cuerpo[i]) * multiplo;
+      multiplo = multiplo < 7 ? multiplo + 1 : 2;
+    }
+    const res = 11 - (suma % 11);
+    const dvEsperado = res === 11 ? '0' : res === 10 ? 'K' : String(res);
+    const valido = dv === dvEsperado;
+    const formatted = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv;
+    return { valido: valido, formatted: formatted, dvEsperado: dvEsperado, mensaje: valido ? 'RUT válido' : 'Dígito verificador incorrecto' };
+  }
+
+  async function renderInicio(forceRefresh) {
     setActive('inicio', 'Panel de gestión');
-    $('#view').innerHTML = '<div class="panel empty">Actualizando consolidado…</div>';
+    let d = null;
+    if (!forceRefresh && state.boot && state.boot.dashboard) {
+      d = state.boot.dashboard;
+    } else {
+      $('#view').innerHTML = '<div class="panel empty">Actualizando consolidado…</div>';
+      try {
+        d = assertOk(await call('apiDashboardIntegral', true));
+        if (state.boot) state.boot.dashboard = d;
+      } catch (e) {
+        renderInfo('Panel de gestión', e.message);
+        return;
+      }
+    }
     try {
-      const d = assertOk(await call('apiDashboardIntegral', true));
       const k = d.kpis;
       const items = [
         ['Fichas de emprendedores', k.personas, 'accent-indigo'],
@@ -1350,7 +1414,7 @@
         </div>
       `;
 
-      $('#dashRefreshV2').onclick = renderInicio;
+      $('#dashRefreshV2').onclick = function() { renderInicio(true); };
       document.querySelectorAll('[data-view]').forEach(function(b) {
         b.onclick = function() { render(b.dataset.view); };
       });
@@ -1967,7 +2031,12 @@
             ${inputField('NOMBRES', 'Nombres *', '')}
             ${inputField('APELLIDO_PATERNO', 'Apellido paterno *', '')}
             ${inputField('APELLIDO_MATERNO', 'Apellido materno', '')}
-            ${inputField('RUT', 'RUT', '')}
+            <div class="field">
+              <label>RUT</label>
+              <input name="RUT" placeholder="12.345.678-9 o 12345678-9" autocomplete="off">
+              <div id="rutStatusBadge"></div>
+              <div id="rutDuplicateWarning"></div>
+            </div>
             ${inputField('FECHA_NACIMIENTO', 'Fecha de nacimiento', '', 'date')}
             ${selectField('GENERO', 'Género', '', ['MUJER', 'HOMBRE', 'NO_BINARIO', 'OTRO', 'PREFIERE_NO_INFORMAR'])}
             ${selectField('DISCAPACIDAD_DECLARADA', 'Discapacidad declarada', '', ['SI', 'NO', 'PREFIERE_NO_INFORMAR'])}
@@ -2001,10 +2070,55 @@
       </div>
     `;
     bindSubrubros('#completeForm');
+    
+    // Validación de RUT y advertencia de duplicados en vivo
+    const rutInput = $('#completeForm [name="RUT"]');
+    const badgeEl = $('#rutStatusBadge');
+    const dupEl = $('#rutDuplicateWarning');
+    let dupTimer = null;
+
+    if (rutInput) {
+      rutInput.oninput = function() {
+        const val = rutInput.value.trim();
+        const res = validarRutChileno(val);
+        if (res.valido) {
+          badgeEl.innerHTML = `<span class="rut-badge valid">✓ RUT válido (${res.formatted})</span>`;
+        } else if (val.length >= 8) {
+          badgeEl.innerHTML = `<span class="rut-badge invalid">✗ ${res.mensaje}</span>`;
+        } else {
+          badgeEl.innerHTML = '';
+        }
+
+        clearTimeout(dupTimer);
+        dupEl.innerHTML = '';
+        if (val.length >= 7) {
+          dupTimer = setTimeout(async function() {
+            try {
+              const matches = assertOk(await call('apiBuscarPersonas', val));
+              const exact = matches.find(function(p) {
+                return (p.RUT_NORMALIZADO && p.RUT_NORMALIZADO.replace(/[^0-9K]/gi, '') === val.replace(/[^0-9K]/gi, ''));
+              });
+              if (exact) {
+                dupEl.innerHTML = `
+                  <div class="duplicate-warning-box">
+                    <span>⚠️ Ya existe una ficha registrada para: <strong>${escapeHtml(exact.NOMBRES + ' ' + exact.APELLIDO_PATERNO)}</strong></span>
+                    <button type="button" class="btn btn-secondary btn-small" id="openExistingRegBtn">Abrir ficha</button>
+                  </div>
+                `;
+                const btn = $('#openExistingRegBtn');
+                if (btn) btn.onclick = function() { renderFichaIntegral(exact.ID_PERSONA); };
+              }
+            } catch (ignored) {}
+          }, 350);
+        }
+      };
+    }
+
     $('#saveComplete').onclick = saveRegistroCompleto;
   }
 
   async function saveRegistroCompleto() {
+    const b = $('#saveComplete');
     const form = new FormData($('#completeForm'));
     const all = Object.fromEntries(form.entries());
     const personFields = ['NOMBRES', 'APELLIDO_PATERNO', 'APELLIDO_MATERNO', 'RUT', 'FECHA_NACIMIENTO', 'GENERO', 'DISCAPACIDAD_DECLARADA', 'EMAIL', 'TELEFONO', 'COMUNA_RESIDENCIA'];
@@ -2012,11 +2126,13 @@
     personFields.forEach(function(k) { persona[k] = all[k]; delete all[k]; });
     Object.assign(emp, all);
     try {
+      if (b) { b.disabled = true; b.textContent = 'Guardando ficha integral…'; }
       const data = assertOk(await call('apiRegistroCompleto', { PERSONA: persona, EMPRENDIMIENTO: emp }));
-      alertMsg(data.personaReutilizada ? 'Se actualizó la ficha existente sin duplicarla.' : 'Ficha integral creada.');
+      alertMsg(data.personaReutilizada ? 'Se actualizó la ficha existente sin duplicarla.' : 'Ficha integral creada exitosamente.');
       renderFichaIntegral(data.persona.ID_PERSONA);
     } catch (e) {
       alertMsg(e.message, 'error');
+      if (b) { b.disabled = false; b.textContent = 'Guardar ficha integral'; }
     }
   }
 

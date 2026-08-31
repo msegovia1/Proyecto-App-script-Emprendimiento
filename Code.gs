@@ -777,6 +777,8 @@ function repoContar(tabla, filtro) {
 // SGE v2.1.0 - Ficha integral del emprendedor
 // Gestión de identidad, roles y control de acceso basado en permisos (RBAC)
 
+let _usuarioActualCache = null;
+
 /**
  * Obtiene el correo electrónico del usuario activo en la sesión.
  */
@@ -785,14 +787,16 @@ function emailActual_() {
 }
 
 /**
- * Recupera el registro del usuario activo verificando que se encuentre habilitado.
+ * Recupera el registro del usuario activo verificando que se encuentre habilitado con caché en memoria.
  */
 function usuarioActual_() {
+  if (_usuarioActualCache) return _usuarioActualCache;
   const email = emailActual_();
   exigir_(email, 'SIN_IDENTIDAD', 'No fue posible obtener el correo institucional.');
   const users = repoListar('USUARIOS', { filtro: { EMAIL: email }, incluirInactivos: true, limit: 10 });
   exigir_(users.length && String(users[0].ACTIVO).toUpperCase() !== 'NO', 'SIN_ACCESO', 'Usuario no autorizado.');
-  return users[0];
+  _usuarioActualCache = users[0];
+  return _usuarioActualCache;
 }
 
 /**
@@ -4092,13 +4096,24 @@ function apiListarFichasIntegrales(filtros) {
     const rels = repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }).filter(function(r) { return r.ESTADO_REGISTRO !== 'INACTIVO'; });
     const todosDocs = repoTodos('DOCUMENTOS', { incluirInactivos: true });
 
+    const relsPorPersona = {};
+    rels.forEach(function(r) { relsPorPersona[String(r.ID_PERSONA)] = r; });
+    const docsPorPersona = {};
+    const docsPorEmp = {};
+    todosDocs.forEach(function(d) {
+      if (d.TIPO_SUJETO === 'PERSONA') {
+        (docsPorPersona[String(d.ID_SUJETO)] = docsPorPersona[String(d.ID_SUJETO)] || []).push(d);
+      } else if (d.TIPO_SUJETO === 'EMPRENDIMIENTO') {
+        (docsPorEmp[String(d.ID_SUJETO)] = docsPorEmp[String(d.ID_SUJETO)] || []).push(d);
+      }
+    });
+
     let rows = personas.map(function(p) {
-      const rel = rels.find(function(r) { return String(r.ID_PERSONA) === String(p.ID_PERSONA); });
+      const rel = relsPorPersona[String(p.ID_PERSONA)];
       const e = rel ? emps[String(rel.ID_EMPRENDIMIENTO)] : null;
-      const docs = todosDocs.filter(function(d) {
-        return (d.TIPO_SUJETO === 'PERSONA' && String(d.ID_SUJETO) === String(p.ID_PERSONA)) ||
-               (e && d.TIPO_SUJETO === 'EMPRENDIMIENTO' && String(d.ID_SUJETO) === String(e.ID_EMPRENDIMIENTO));
-      });
+      const dPers = docsPorPersona[String(p.ID_PERSONA)] || [];
+      const dEmp = e ? (docsPorEmp[String(e.ID_EMPRENDIMIENTO)] || []) : [];
+      const docs = dPers.concat(dEmp);
       const res = resumenFichaIntegral_(p, e, docs);
       return {
         ID_PERSONA: p.ID_PERSONA,
@@ -5446,7 +5461,7 @@ function apiBootstrap() {
     const user = usuarioActual_();
     let dashboard = null;
     if (puede_('REPORTE_VER')) {
-      const dbResp = apiDashboard();
+      const dbResp = apiDashboardIntegral(false);
       if (dbResp.ok) dashboard = dbResp.data;
     }
     const props = PropertiesService.getScriptProperties();
