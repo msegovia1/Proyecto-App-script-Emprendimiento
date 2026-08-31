@@ -2,10 +2,10 @@
 // SGE v2.1.0 - Ficha integral del emprendedor
 // Capa de persistencia y operaciones CRUD de alto rendimiento sobre Google Sheets
 
-let _schemaHeadersCache = null;
-let _dbInstance = null;
-let _sheetCache = {};
-let _repoTodosCache = {};
+var _schemaHeadersCache = null;
+var _dbInstance = null;
+var _sheetCache = {};
+var _repoTodosCache = {};
 
 /**
  * Obtiene la instancia activa de Google Sheets con caché de ejecución y fallback seguro.

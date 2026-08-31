@@ -6,12 +6,15 @@
  * Punto de entrada HTTP GET para la aplicación web de Google Apps Script.
  */
 function doGet() {
-  let template;
-  try {
-    template = HtmlService.createTemplateFromFile('Index');
-  } catch (e) {
-    template = HtmlService.createTemplateFromFile('frontend/Index');
+  const candidates = ['Index', 'src/frontend/Index', 'frontend/Index'];
+  let template = null;
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      template = HtmlService.createTemplateFromFile(candidates[i]);
+      if (template) break;
+    } catch (ignored) {}
   }
+  if (!template) template = HtmlService.createTemplateFromFile('Index');
   template.appName = APP.NAME;
   template.version = APP.VERSION;
   return template.evaluate()
@@ -20,19 +23,18 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
-/**
- * Función auxiliar para incluir archivos HTML parciales (Styles, Scripts, etc.) en plantillas.
- */
 function include_(filename) {
-  try {
-    return HtmlService.createHtmlOutputFromFile(filename).getContent();
-  } catch (e) {
+  const candidates = [
+    filename,
+    'src/frontend/' + filename,
+    'frontend/' + filename
+  ];
+  for (let i = 0; i < candidates.length; i++) {
     try {
-      return HtmlService.createHtmlOutputFromFile('frontend/' + filename).getContent();
-    } catch (e2) {
-      throw e;
-    }
+      return HtmlService.createHtmlOutputFromFile(candidates[i]).getContent();
+    } catch (ignored) {}
   }
+  return '';
 }
 
 /**

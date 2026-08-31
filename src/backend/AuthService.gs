@@ -2,7 +2,7 @@
 // SGE v2.1.0 - Ficha integral del emprendedor
 // Gestión de identidad, roles y control de acceso basado en permisos (RBAC)
 
-let _usuarioActualCache = null;
+var _usuarioActualCache = null;
 
 /**
  * Obtiene el correo electrónico del usuario activo en la sesión.
