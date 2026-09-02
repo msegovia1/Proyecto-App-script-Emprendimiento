@@ -22,6 +22,18 @@ function apiOpcionesSeleccion() {
     });
     const procesos = repoTodos('PROCESOS_SELECCION', { incluirInactivos: true });
     const posts = repoTodos('POSTULACIONES', { incluirInactivos: true });
+    const postsAdmisiblesPorIni = {};
+    posts.forEach(function(p) {
+      if (p.ESTADO_POSTULACION === 'ADMISIBLE') {
+        postsAdmisiblesPorIni[String(p.ID_INICIATIVA)] = (postsAdmisiblesPorIni[String(p.ID_INICIATIVA)] || 0) + 1;
+      }
+    });
+    const procPorIni = {};
+    procesos.forEach(function(p) {
+      if (p.ESTADO === 'EJECUTADO') {
+        procPorIni[String(p.ID_INICIATIVA)] = (procPorIni[String(p.ID_INICIATIVA)] || 0) + 1;
+      }
+    });
     return respuestaOk(iniciativas.map(function(i) {
       return {
         ID_INICIATIVA: i.ID_INICIATIVA,
@@ -30,12 +42,8 @@ function apiOpcionesSeleccion() {
         ESTADO: i.ESTADO,
         CUPOS_TITULARES: i.CUPOS_TITULARES,
         CUPOS_SUPLENTES: i.CUPOS_SUPLENTES,
-        POSTULACIONES_ADMISIBLES: posts.filter(function(p) {
-          return String(p.ID_INICIATIVA) === String(i.ID_INICIATIVA) && p.ESTADO_POSTULACION === 'ADMISIBLE';
-        }).length,
-        SELECCIONES_EJECUTADAS: procesos.filter(function(p) {
-          return String(p.ID_INICIATIVA) === String(i.ID_INICIATIVA) && p.ESTADO === 'EJECUTADO';
-        }).length
+        POSTULACIONES_ADMISIBLES: postsAdmisiblesPorIni[String(i.ID_INICIATIVA)] || 0,
+        SELECCIONES_EJECUTADAS: procPorIni[String(i.ID_INICIATIVA)] || 0
       };
     }));
   } catch (error) {
@@ -48,6 +56,7 @@ function apiListarProcesosSeleccion(iniciativaId) {
     usuarioActual_();
     exigir_(puede_('SELECCION_EJECUTAR') || puede_('SELECCION_VER'), 'PROHIBIDO', 'No tiene permiso para consultar selecciones.');
     const mapas = mapasPostulaciones_();
+    const postsMap = indexarPor_(repoTodos('POSTULACIONES', { incluirInactivos: true }), 'ID_POSTULACION');
     const procesos = repoTodos('PROCESOS_SELECCION', { incluirInactivos: true }).filter(function(p) {
       return !iniciativaId || String(p.ID_INICIATIVA) === String(iniciativaId);
     }).sort(function(a, b) {
@@ -60,7 +69,7 @@ function apiListarProcesosSeleccion(iniciativaId) {
       }).sort(function(a, b) {
         return Number(a.POSICION) - Number(b.POSICION);
       }).map(function(r) {
-        const base = repoBuscarPorId('POSTULACIONES', r.ID_POSTULACION);
+        const base = postsMap[String(r.ID_POSTULACION)];
         return Object.assign({}, r, enriquecerPostulacion_(base || {}, mapas));
       });
       return Object.assign({}, p, {

@@ -75,10 +75,12 @@ function apiDashboard(force) {
     const docsPersona = docsActuales.filter(function(d) {
       return d.TIPO_SUJETO === 'PERSONA' && documentoUtilizable_(d);
     });
+    const docsPorPersonaMap = {};
+    docsPersona.forEach(function(d) {
+      (docsPorPersonaMap[String(d.ID_SUJETO)] = docsPorPersonaMap[String(d.ID_SUJETO)] || []).push(d.TIPO_DOCUMENTO);
+    });
     const completos = personas.filter(function(p) {
-      const tipos = docsPersona.filter(function(d) {
-        return String(d.ID_SUJETO) === String(p.ID_PERSONA);
-      }).map(function(d) { return d.TIPO_DOCUMENTO; });
+      const tipos = docsPorPersonaMap[String(p.ID_PERSONA)] || [];
       const cedula = tipos.indexOf('CEDULA_IDENTIDAD_COMPLETA') >= 0 || (tipos.indexOf('CEDULA_IDENTIDAD_FRONTAL') >= 0 && tipos.indexOf('CEDULA_IDENTIDAD_REVERSO') >= 0);
       return cedula && tipos.indexOf('REGISTRO_SOCIAL_HOGARES') >= 0;
     }).length;
@@ -87,6 +89,10 @@ function apiDashboard(force) {
       return out;
     }, {});
     const hoy = Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyy-MM-dd');
+    const postsPorIniciativa = {};
+    posts.forEach(function(p) {
+      postsPorIniciativa[String(p.ID_INICIATIVA)] = (postsPorIniciativa[String(p.ID_INICIATIVA)] || 0) + 1;
+    });
     const data = {
       kpis: {
         personas: personas.length,
@@ -118,7 +124,7 @@ function apiDashboard(force) {
           NOMBRE: i.NOMBRE,
           ESTADO: i.ESTADO,
           FECHA_EJECUCION: i.FECHA_EJECUCION,
-          POSTULACIONES: posts.filter(function(p) { return String(p.ID_INICIATIVA) === String(i.ID_INICIATIVA); }).length
+          POSTULACIONES: postsPorIniciativa[String(i.ID_INICIATIVA)] || 0
         };
       }),
       actualizadoEn: ahoraIso_()

@@ -475,6 +475,11 @@
         <div id="fichasRows" class="empty">Cargando fichas…</div>
       </div>
     `;
+    let fichaTimer = null;
+    $('#fichaQ').oninput = function() {
+      clearTimeout(fichaTimer);
+      fichaTimer = setTimeout(function() { cargarFichasIntegrales(0); }, 300);
+    };
     $('#fichaBuscar').onclick = function() { cargarFichasIntegrales(0); };
     $('#fichaQ').onkeydown = function(e) { if (e.key === 'Enter') cargarFichasIntegrales(0); };
     $('#fichaRubro').onchange = $('#fichaHabilitada').onchange = function() { cargarFichasIntegrales(0); };
@@ -1074,12 +1079,22 @@
           </div>
         </div>
         <div class="search-row">
-          <input id="q" placeholder="RUT, nombre, correo, teléfono, rubro o emprendimiento">
+          <input id="q" placeholder="RUT, nombre, correo, teléfono, rubro o emprendimiento" autocomplete="off">
           <button class="btn btn-primary" id="searchBtn">Buscar</button>
         </div>
         <div id="results" class="empty">Ingrese al menos dos caracteres.</div>
       </div>
     `;
+    let qTimer = null;
+    $('#q').oninput = function() {
+      clearTimeout(qTimer);
+      const val = $('#q').value.trim();
+      if (val.length >= 2) {
+        qTimer = setTimeout(runMasterSearch, 300);
+      } else if (!val) {
+        $('#results').innerHTML = '<div class="empty">Ingrese al menos dos caracteres.</div>';
+      }
+    };
     $('#searchBtn').onclick = runMasterSearch;
     $('#q').onkeydown = function(e) { if (e.key === 'Enter') runMasterSearch(); };
     setTimeout(function() { $('#q').focus(); }, 0);
@@ -1305,6 +1320,11 @@
         <div id="empResults" class="empty">Cargando registros…</div>
       </div>
     `;
+    let empTimer = null;
+    $('#empQ').oninput = function() {
+      clearTimeout(empTimer);
+      empTimer = setTimeout(function() { loadEmprendimientos(0); }, 300);
+    };
     $('#newEmp').onclick = function() { renderEmprendimientoForm(); };
     $('#empSearch').onclick = function() { loadEmprendimientos(0); };
     $('#empQ').onkeydown = function(e) { if (e.key === 'Enter') loadEmprendimientos(0); };
@@ -1693,6 +1713,11 @@
         <div id="initiativeResults" class="empty">Cargando…</div>
       </div>
     `;
+    let iniTimer = null;
+    $('#initiativeQ').oninput = function() {
+      clearTimeout(iniTimer);
+      iniTimer = setTimeout(function() { loadIniciativas(0); }, 300);
+    };
     $('#newInitiative').onclick = function() { renderIniciativaForm(); };
     $('#initiativeSearch').onclick = function() { loadIniciativas(0); };
     $('#initiativeQ').onkeydown = function(e) { if (e.key === 'Enter') loadIniciativas(0); };
@@ -2382,6 +2407,11 @@
         <div id="applicationResults" class="empty">Cargando…</div>
       </div>
     `;
+    let postTimer = null;
+    $('#applicationQ').oninput = function() {
+      clearTimeout(postTimer);
+      postTimer = setTimeout(function() { loadPostulaciones(0); }, 300);
+    };
     $('#applicationSearch').onclick = function() { loadPostulaciones(0); };
     $('#applicationQ').onkeydown = function(e) { if (e.key === 'Enter') loadPostulaciones(0); };
     $('#applicationState').onchange = function() { loadPostulaciones(0); };
@@ -2597,7 +2627,13 @@
       };
 
       const refresh = function() { loadSelectionV2(updateCounter); };
+      let v2Timer = null;
+      $('#v2Q').oninput = function() {
+        clearTimeout(v2Timer);
+        v2Timer = setTimeout(refresh, 300);
+      };
       $('#v2Filter').onclick = refresh;
+      $('#v2Rubro').onchange = $('#v2Formal').onchange = refresh;
       $('#v2Market').onchange = function() {
         const opt = $('#v2Market').selectedOptions[0];
         if (opt) {

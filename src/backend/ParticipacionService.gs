@@ -54,7 +54,12 @@ function apiCandidatosSeleccionManual(iniciativaId, filtros) {
     const q = normalizarTexto_(filtros.q).toLowerCase();
     const personas = indexarPor_(repoTodos('PERSONAS', { incluirInactivos: true }), 'ID_PERSONA');
     const relaciones = repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true });
-    const docs = repoTodos('DOCUMENTOS', { incluirInactivos: true });
+    const relsPorEmp = {};
+    relaciones.forEach(function(x) {
+      if (x.ES_PRINCIPAL === 'SI' && x.ESTADO_REGISTRO !== 'INACTIVO') {
+        relsPorEmp[String(x.ID_EMPRENDIMIENTO)] = x;
+      }
+    });
     let rows = repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }).filter(function(e) {
       return e.ESTADO_EMPRENDIMIENTO === 'ACTIVO';
     });
@@ -73,9 +78,7 @@ function apiCandidatosSeleccionManual(iniciativaId, filtros) {
     }
     if (q) {
       rows = rows.filter(function(e) {
-        const r = relaciones.find(function(x) {
-          return String(x.ID_EMPRENDIMIENTO) === String(e.ID_EMPRENDIMIENTO) && x.ES_PRINCIPAL === 'SI' && x.ESTADO_REGISTRO !== 'INACTIVO';
-        });
+        const r = relsPorEmp[String(e.ID_EMPRENDIMIENTO)];
         const p = r && personas[String(r.ID_PERSONA)];
         return [
           e.CODIGO_EMPRENDIMIENTO, e.NOMBRE_COMERCIAL, e.ID_RUBRO, e.TERRITORIO_OPERACION,
@@ -84,9 +87,7 @@ function apiCandidatosSeleccionManual(iniciativaId, filtros) {
       });
     }
     return respuestaOk(rows.slice(0, 200).map(function(e) {
-      const r = relaciones.find(function(x) {
-        return String(x.ID_EMPRENDIMIENTO) === String(e.ID_EMPRENDIMIENTO) && x.ES_PRINCIPAL === 'SI' && x.ESTADO_REGISTRO !== 'INACTIVO';
-      });
+      const r = relsPorEmp[String(e.ID_EMPRENDIMIENTO)];
       const p = r && personas[String(r.ID_PERSONA)];
       return {
         ID_EMPRENDIMIENTO: e.ID_EMPRENDIMIENTO,
@@ -204,13 +205,18 @@ function apiBandejaConfirmados(iniciativaId) {
     const mapas = mapasPostulaciones_();
     const results = repoTodos('RESULTADOS_SELECCION', { incluirInactivos: true });
     const processes = indexarPor_(repoTodos('PROCESOS_SELECCION', { incluirInactivos: true }), 'ID_PROCESO');
+    const postsMap = indexarPor_(repoTodos('POSTULACIONES', { incluirInactivos: true }), 'ID_POSTULACION');
     const parts = repoTodos('PARTICIPACIONES', { incluirInactivos: true });
+    const partsMap = {};
+    parts.forEach(function(x) { partsMap[String(x.ID_POSTULACION)] = x; });
+
     return respuestaOk(results.filter(function(r) {
       const p = processes[String(r.ID_PROCESO)];
       return String(p && p.ID_INICIATIVA) === String(iniciativaId) && ['TITULAR', 'SUPLENTE'].indexOf(r.RESULTADO) >= 0;
     }).map(function(r) {
-      const p = enriquecerPostulacion_(repoBuscarPorId('POSTULACIONES', r.ID_POSTULACION) || {}, mapas);
-      const a = parts.find(function(x) { return String(x.ID_POSTULACION) === String(r.ID_POSTULACION); });
+      const post = postsMap[String(r.ID_POSTULACION)] || {};
+      const p = enriquecerPostulacion_(post, mapas);
+      const a = partsMap[String(r.ID_POSTULACION)];
       return Object.assign({}, r, {
         ID_EMPRENDIMIENTO: p.ID_EMPRENDIMIENTO,
         ID_PERSONA: p.ID_PERSONA_CONTACTO,

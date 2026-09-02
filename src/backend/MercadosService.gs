@@ -359,11 +359,13 @@ function apiListarSeguimientoMercado(idIniciativa) {
   try {
     exigirPermiso_('PARTICIPACION_EDITAR');
     const mapas = mapasPostulaciones_();
+    const postsMap = indexarPor_(repoTodos('POSTULACIONES', { incluirInactivos: true }), 'ID_POSTULACION');
     const rows = repoTodos('SEGUIMIENTO_MERCADO', { incluirInactivos: true }).filter(function(x) {
       return !idIniciativa || String(x.ID_INICIATIVA) === String(idIniciativa);
     }).map(function(x) {
       const e = mapas.emprendimientos[String(x.ID_EMPRENDIMIENTO)] || {};
-      const p = mapas.personas[String((repoBuscarPorId('POSTULACIONES', x.ID_POSTULACION) || {}).ID_PERSONA_CONTACTO)] || {};
+      const post = postsMap[String(x.ID_POSTULACION)] || {};
+      const p = mapas.personas[String(post.ID_PERSONA_CONTACTO)] || {};
       return Object.assign({}, x, {
         NOMBRE_EMPRENDIMIENTO: e.NOMBRE_COMERCIAL || '',
         NOMBRE_CONTACTO: nombrePersona_(p),
@@ -592,6 +594,14 @@ function apiDashboardIntegral(force) {
       seguidores.antes += Number(s.SEGUIDORES_ANTES || 0);
       seguidores.despues += Number(s.SEGUIDORES_DESPUES || 0);
     });
+    const postsPorIniciativa = {};
+    posts.forEach(function(p) {
+      postsPorIniciativa[String(p.ID_INICIATIVA)] = (postsPorIniciativa[String(p.ID_INICIATIVA)] || 0) + 1;
+    });
+    const segPorIniciativa = {};
+    seguimientos.forEach(function(s) {
+      segPorIniciativa[String(s.ID_INICIATIVA)] = (segPorIniciativa[String(s.ID_INICIATIVA)] || 0) + 1;
+    });
     const mercados = iniciativas.filter(function(i) {
       return ['MERCADO', 'FERIA'].indexOf(i.TIPO_INICIATIVA) >= 0;
     }).map(function(i) {
@@ -600,8 +610,8 @@ function apiDashboardIntegral(force) {
         NOMBRE: i.NOMBRE,
         ESTADO: i.ESTADO,
         FECHA_EJECUCION: i.FECHA_EJECUCION,
-        POSTULACIONES: posts.filter(function(p) { return String(p.ID_INICIATIVA) === String(i.ID_INICIATIVA); }).length,
-        SEGUIMIENTOS: seguimientos.filter(function(s) { return String(s.ID_INICIATIVA) === String(i.ID_INICIATIVA); }).length
+        POSTULACIONES: postsPorIniciativa[String(i.ID_INICIATIVA)] || 0,
+        SEGUIMIENTOS: segPorIniciativa[String(i.ID_INICIATIVA)] || 0
       };
     });
     return respuestaOk(Object.assign({}, base.data, {

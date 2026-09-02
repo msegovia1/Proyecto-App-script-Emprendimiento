@@ -303,12 +303,16 @@ function indexarPor_(rows, campo) {
   }, {});
 }
 
+var _mapasPostulacionesCache = null;
+
 function mapasPostulaciones_() {
-  return {
+  if (_mapasPostulacionesCache) return _mapasPostulacionesCache;
+  _mapasPostulacionesCache = {
     iniciativas: indexarPor_(repoTodos('INICIATIVAS', { incluirInactivos: true }), 'ID_INICIATIVA'),
     emprendimientos: indexarPor_(repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }), 'ID_EMPRENDIMIENTO'),
     personas: indexarPor_(repoTodos('PERSONAS', { incluirInactivos: true }), 'ID_PERSONA')
   };
+  return _mapasPostulacionesCache;
 }
 
 function enriquecerPostulacion_(p, mapas) {
