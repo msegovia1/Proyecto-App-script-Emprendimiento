@@ -266,6 +266,27 @@ function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
           // 11. Ejecutar Selección Simulada
           const selRes = apiEjecutarSeleccion(mId, { semilla: 12345, cuposTitulares: 1, cuposSuplentes: 1 });
           registrar('11. Ejecución de proceso de selección con semilla', selRes.ok, selRes.ok ? 'Selección exitosa' : (selRes.error ? selRes.error.message : ''));
+
+          // 12. Simulación de procesamiento de documentos y postulación
+          try {
+            const simulacionDoc = repoInsertar('DOCUMENTOS', {
+              ID_DOCUMENTO: uuid_(),
+              TIPO_SUJETO: 'PERSONA',
+              ID_SUJETO: pId,
+              TIPO_DOCUMENTO: 'CEDULA_IDENTIDAD_COMPLETA',
+              ID_ARCHIVO_DRIVE: 'TEST_DRIVE_FILE_ID',
+              VERSION: 1,
+              FECHA_EMISION: Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyy-MM-dd'),
+              FECHA_VENCIMIENTO: '2028-12-31',
+              ESTADO_REVISION: 'RECIBIDO',
+              ES_VERSION_VIGENTE: 'SI',
+              CREADO_EN: ahoraIso_(),
+              CREADO_POR: 'TEST_E2E'
+            }, { auditar: false });
+            registrar('12. Ingesta y registro documental en Unidad Compartida', !!simulacionDoc, 'Documento ID: ' + simulacionDoc.ID_DOCUMENTO);
+          } catch (eDoc) {
+            registrar('12. Ingesta y registro documental en Unidad Compartida', false, eDoc.message);
+          }
         } else {
           registrar('9. Registro de Postulación a Mercado', false, postRes.error ? postRes.error.message : '');
         }
@@ -273,14 +294,14 @@ function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
         registrar('8. Creación de Mercado / Iniciativa', false, mercadoRes.error ? mercadoRes.error.message : '');
       }
 
-      // 12. Dashboard Integral
+      // 13. Dashboard Integral
       const dashRes = apiDashboardIntegral(true);
-      registrar('12. Cálculo de KPIs y Dashboard Integral en vivo', dashRes.ok, dashRes.ok ? 'KPIs calculados correctamente' : '');
+      registrar('13. Cálculo de KPIs y Dashboard Integral en vivo', dashRes.ok, dashRes.ok ? 'KPIs calculados correctamente' : '');
 
-      // 13. Limpieza de datos de prueba
+      // 14. Limpieza de datos de prueba
       if (limpiarDespues) {
         try {
-          const tablasLimpieza = ['PERSONAS', 'EMPRENDIMIENTOS', 'PERSONA_EMPRENDIMIENTO', 'INICIATIVAS', 'POSTULACIONES', 'PROCESOS_SELECCION', 'RESULTADOS_SELECCION'];
+          const tablasLimpieza = ['PERSONAS', 'EMPRENDIMIENTOS', 'PERSONA_EMPRENDIMIENTO', 'INICIATIVAS', 'POSTULACIONES', 'PROCESOS_SELECCION', 'RESULTADOS_SELECCION', 'DOCUMENTOS'];
           tablasLimpieza.forEach(function(t) {
             const s = hoja_(t);
             const data = s.getDataRange().getValues();
@@ -291,12 +312,12 @@ function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
               }
             }
           });
-          registrar('13. Limpieza de datos de prueba (Cleanup)', true, 'Base de datos restaurada limpia');
+          registrar('14. Limpieza de datos de prueba (Cleanup)', true, 'Base de datos restaurada limpia');
         } catch (eClean) {
-          registrar('13. Limpieza de datos de prueba (Cleanup)', false, eClean.message);
+          registrar('14. Limpieza de datos de prueba (Cleanup)', false, eClean.message);
         }
       } else {
-        registrar('13. Registros de prueba conservados para inspección visual', true, 'Revise en la interfaz web');
+        registrar('14. Registros de prueba conservados para inspección visual', true, 'Revise en la interfaz web');
       }
 
     } else {
