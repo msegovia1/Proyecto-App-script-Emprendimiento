@@ -854,8 +854,8 @@ function crearFormularioMercadoDesdePlantilla_(idIniciativa, reemplazar) {
   if (oldId) {
     try { cerrarRespuestasFormulario_(FormApp.openById(oldId)); } catch (ignored) {}
   }
-  const folder = DriveApp.getFolderById(prepararCarpetaMercado_(idIniciativa).id);
-  const copy = DriveApp.getFileById(templateId).makeCopy('Postulación a ' + iniciativa.NOMBRE, folder);
+  const targetFolder = carpetaFormulariosPublicos_();
+  const copy = DriveApp.getFileById(templateId).makeCopy('Postulación a ' + iniciativa.NOMBRE, targetFolder);
   const form = FormApp.openById(copy.getId());
   form.setTitle('Postulación a ' + iniciativa.NOMBRE);
   form.setDescription('Complete estos datos para postular al mercado ' + iniciativa.NOMBRE + '. Si ya está registrado, utilice el mismo RUT y cargue solo documentos nuevos o actualizados. El certificado de inicio de actividades es condición para participar.');

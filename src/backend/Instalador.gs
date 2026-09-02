@@ -523,6 +523,9 @@ function crearFormularioUnicoRegistro() {
       props.setProperty(APP.PROP_FORM_ID, form.getId());
     }
     asegurarCamposFormularioRegistro_(form);
+    try {
+      DriveApp.getFileById(form.getId()).moveTo(carpetaFormulariosPublicos_());
+    } catch (ignored) {}
     const triggers = ScriptApp.getProjectTriggers();
     if (!triggers.some(function(t) { return t.getHandlerFunction() === 'procesarRegistroFormulario'; })) {
       ScriptApp.newTrigger('procesarRegistroFormulario').forForm(form).onFormSubmit().create();
@@ -532,6 +535,53 @@ function crearFormularioUnicoRegistro() {
     actualizarPanelOperativoSheets();
     return respuestaOk({ id: form.getId(), url: url, editUrl: form.getEditUrl() });
   } catch (error) { return manejarError_(error, 'crearFormularioUnicoRegistro'); }
+}
+
+function carpetaFormulariosPublicos_() {
+  const rootPersonal = DriveApp.getRootFolder();
+  const folders = rootPersonal.getFoldersByName('SGE - Formularios Convocatorias');
+  return folders.hasNext() ? folders.next() : rootPersonal.createFolder('SGE - Formularios Convocatorias');
+}
+
+/**
+ * Traslada los formularios de Google a "Mi Unidad" en la carpeta "SGE - Formularios Convocatorias"
+ * para que Google Forms permita agregar y utilizar preguntas de "Carga de archivos" sin error.
+ */
+function migrarFormulariosAMiUnidad() {
+  const carpetaDestino = carpetaFormulariosPublicos_();
+  const props = PropertiesService.getScriptProperties();
+  const ids = [
+    props.getProperty(APP.PROP_FORM_ID),
+    props.getProperty(APP.PROP_FORM_MERCADO_TEMPLATE_ID)
+  ].filter(Boolean);
+
+  const map = JSON.parse(props.getProperty('SGE_FORM_MERCADO_MAP') || '{}');
+  Object.keys(map).forEach(function(formId) {
+    if (ids.indexOf(formId) < 0) ids.push(formId);
+  });
+
+  const movidos = [];
+  ids.forEach(function(id) {
+    try {
+      const file = DriveApp.getFileById(id);
+      file.moveTo(carpetaDestino);
+      movidos.push(file.getName());
+    } catch (e) {
+      Logger.log('No se pudo mover ' + id + ': ' + e.message);
+    }
+  });
+
+  Logger.log('=====================================================');
+  Logger.log('✅ FORMULARIOS MOVIDOS A MI UNIDAD:');
+  Logger.log('📁 Carpeta: ' + carpetaDestino.getName() + ' (' + carpetaDestino.getUrl() + ')');
+  Logger.log('📋 Archivos: ' + (movidos.join(', ') || 'Ninguno'));
+  Logger.log('=====================================================');
+
+  return respuestaOk({
+    mensaje: 'Formularios movidos a Mi Unidad. Ahora admiten carga de archivos sin restricciones.',
+    carpetaUrl: carpetaDestino.getUrl(),
+    formulariosMovidos: movidos
+  });
 }
 
 function asegurarCamposFormularioRegistro_(form) {
