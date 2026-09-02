@@ -119,6 +119,7 @@ function apiCambiarEstadoIniciativa(id, estado, motivo) {
         }
       } catch (ignored) {}
     }
+    try { sincronizarMercadosEnFormularioUnico_(); } catch (ignored) {}
     return respuestaOk({
       iniciativa: result,
       advertencia: aperturaFutura ? 'La iniciativa fue abierta antes de la fecha programada. La excepción quedó auditada.' : ''

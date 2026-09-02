@@ -817,72 +817,137 @@ function formIdMercado_(idIniciativa) {
   return ids.length ? ids[ids.length - 1] : '';
 }
 
+function obtenerOCrearFormularioUnicoMercados_() {
+  const props = PropertiesService.getScriptProperties();
+  let id = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_ID);
+  let form = abrirFormularioSeguro_(id);
+  
+  if (!form) {
+    const templateId = props.getProperty(APP.PROP_FORM_MERCADO_TEMPLATE_ID);
+    form = abrirFormularioSeguro_(templateId);
+  }
+  
+  if (!form) {
+    const carpeta = carpetaFormulariosPublicos_();
+    const archivos = carpeta.getFilesByName('Postulación a Mercados y Convocatorias - Municipalidad de Santiago');
+    if (archivos.hasNext()) {
+      form = FormApp.openById(archivos.next().getId());
+    }
+  }
+  
+  if (!form) {
+    form = FormApp.create('Postulación a Mercados y Convocatorias - Municipalidad de Santiago');
+    form.setDescription('Formulario oficial para postular a ferias, mercados y convocatorias de emprendimiento de la Municipalidad de Santiago. Si ya está registrado en el SGE, ingrese su RUT y se mantendrán sus antecedentes actualizados.');
+    form.setConfirmationMessage('Postulación recibida exitosamente. El equipo municipal revisará los antecedentes según las bases de la convocatoria.');
+    asegurarCamposBaseFormularioMercado_(form);
+    
+    try {
+      DriveApp.getFileById(form.getId()).moveTo(carpetaFormulariosPublicos_());
+    } catch (ignored) {}
+    
+    try {
+      form.setDestination(FormApp.DestinationType.SPREADSHEET, db_().getId());
+    } catch (ignored) {}
+  }
+  
+  habilitarRespuestasFormulario_(form);
+  props.setProperty(APP.PROP_FORM_MERCADO_UNICO_ID, form.getId());
+  props.setProperty(APP.PROP_FORM_MERCADO_UNICO_URL, form.getPublishedUrl());
+  
+  // Asegurar trigger único para este formulario maestro
+  const triggers = ScriptApp.getProjectTriggers();
+  const tieneTrigger = triggers.some(function(t) {
+    return t.getHandlerFunction() === 'procesarPostulacionMercadoFormulario' &&
+           t.getTriggerSourceId() === form.getId();
+  });
+  if (!tieneTrigger) {
+    ScriptApp.newTrigger('procesarPostulacionMercadoFormulario').forForm(form).onFormSubmit().create();
+  }
+  
+  return form;
+}
+
+function sincronizarMercadosEnFormularioUnico_() {
+  const form = obtenerOCrearFormularioUnicoMercados_();
+  if (!form) return null;
+  
+  const items = form.getItems();
+  let selectorItem = null;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const t = (it.getTitle() || '').toLowerCase();
+    if (t.indexOf('mercado') >= 0 || t.indexOf('convocatoria') >= 0 || t.indexOf('feria') >= 0) {
+      if (it.getType() === FormApp.ItemType.LIST || it.getType() === FormApp.ItemType.MULTIPLE_CHOICE) {
+        selectorItem = it;
+        break;
+      }
+    }
+  }
+  
+  if (!selectorItem) {
+    selectorItem = form.addListItem();
+    selectorItem.setTitle('Mercado o Convocatoria a la que postula').setRequired(true);
+    try { form.moveItem(selectorItem.getIndex(), 0); } catch (ignored) {}
+  }
+  
+  const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: false });
+  const abiertas = iniciativas.filter(function(i) {
+    return i.ESTADO === 'ABIERTA';
+  });
+  
+  const formUrl = form.getPublishedUrl();
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(APP.PROP_FORM_MERCADO_UNICO_URL, formUrl);
+  
+  if (abiertas.length > 0) {
+    const opciones = abiertas.map(function(i) {
+      return i.NOMBRE + ' [ID: ' + i.ID_INICIATIVA + ']';
+    });
+    selectorItem.asListItem().setChoiceValues(opciones);
+    habilitarRespuestasFormulario_(form);
+    
+    abiertas.forEach(function(i) {
+      if (i.URL_FORMULARIO_POSTULACION !== formUrl) {
+        repoActualizar('INICIATIVAS', i.ID_INICIATIVA, { URL_FORMULARIO_POSTULACION: formUrl }, { motivo: 'Vinculación a Formulario Único Oficial' });
+      }
+    });
+  } else {
+    selectorItem.asListItem().setChoiceValues(['No hay convocatorias abiertas en este momento']);
+  }
+  
+  return {
+    formId: form.getId(),
+    formUrl: formUrl,
+    editUrl: form.getEditUrl(),
+    totalAbiertas: abiertas.length,
+    mercados: abiertas.map(function(i) { return i.NOMBRE; })
+  };
+}
+
 function crearFormularioMercadoDesdePlantilla_(idIniciativa, reemplazar) {
   const iniciativa = repoBuscarPorId('INICIATIVAS', idIniciativa);
   exigir_(iniciativa, 'NO_ENCONTRADO', 'Mercado no encontrado.');
-  if (iniciativa.URL_FORMULARIO_POSTULACION && !reemplazar) {
-    const existenteId = formIdMercado_(idIniciativa);
-    const existente = existenteId ? FormApp.openById(existenteId) : null;
-    const validacion = existente ? validarPlantillaFormularioMercado_(existente) : {
-      completa: false,
-      faltantes: DOCUMENTOS_FORMULARIO_REGISTRO.map(function(x) { return x.titulo; })
-    };
-    return {
-      url: iniciativa.URL_FORMULARIO_POSTULACION,
-      editUrl: existente ? existente.getEditUrl() : '',
-      id: existenteId,
-      documentosConfigurados: validacion.completa,
-      faltantes: validacion.faltantes,
-      mensaje: 'El formulario ya existe.'
-    };
+  
+  if (iniciativa.ESTADO === 'BORRADOR') {
+    repoActualizar('INICIATIVAS', idIniciativa, { ESTADO: 'ABIERTA' }, { motivo: 'Apertura automática al generar enlace de postulación' });
   }
-  const props = PropertiesService.getScriptProperties();
-  let templateId = props.getProperty(APP.PROP_FORM_MERCADO_TEMPLATE_ID);
-  let template = abrirFormularioSeguro_(templateId);
-  let validacion = template ? validarPlantillaFormularioMercado_(template) : {
-    completa: false,
-    faltantes: DOCUMENTOS_FORMULARIO_REGISTRO.map(function(x) { return x.titulo; }),
-    tiposIncorrectos: [],
-    detalle: 'No existe una plantilla accesible.'
-  };
-  let recuperada = null;
-  if (!validacion.completa) {
-    recuperada = recuperarPlantillaDocumental_(idIniciativa);
-    if (recuperada) {
-      template = recuperada.form;
-      templateId = template.getId();
-      validacion = validarPlantillaFormularioMercado_(template);
-    }
-  }
-  exigir_(templateId && template, 'PLANTILLA_NO_CONFIGURADA', 'Primero prepare la plantilla de formularios de mercado.');
-  exigir_(validacion.completa, 'PLANTILLA_DOCUMENTAL_INCOMPLETA', (validacion.detalle || 'La plantilla no contiene las cinco preguntas documentales.') + ' Abra “Configurar plantilla documental” y compruebe que cada una sea del tipo “Subir archivos”.');
-  const oldId = reemplazar ? formIdMercado_(idIniciativa) : '';
-  if (oldId) {
-    try { cerrarRespuestasFormulario_(FormApp.openById(oldId)); } catch (ignored) {}
-    limpiarActivadorFormulario_(oldId);
-  }
-  limpiarActivadoresHuerfanosMercados_();
-  const targetFolder = carpetaFormulariosPublicos_();
-  const copy = DriveApp.getFileById(templateId).makeCopy('Postulación a ' + iniciativa.NOMBRE, targetFolder);
-  const form = FormApp.openById(copy.getId());
-  form.setTitle('Postulación a ' + iniciativa.NOMBRE);
-  form.setDescription('Complete estos datos para postular al mercado ' + iniciativa.NOMBRE + '. Si ya está registrado, utilice el mismo RUT y cargue solo documentos nuevos o actualizados. El certificado de inicio de actividades es condición para participar.');
-  form.setConfirmationMessage('Postulación recibida. Los documentos quedan registrados automáticamente y solo serán observados si presentan un problema.');
-  form.setDestination(FormApp.DestinationType.SPREADSHEET, db_().getId());
-  habilitarRespuestasFormulario_(form);
-  const map = JSON.parse(props.getProperty('SGE_FORM_MERCADO_MAP') || '{}');
-  map[form.getId()] = idIniciativa;
-  props.setProperty('SGE_FORM_MERCADO_MAP', JSON.stringify(map));
-  ScriptApp.newTrigger('procesarPostulacionMercadoFormulario').forForm(form).onFormSubmit().create();
-  repoActualizar('INICIATIVAS', idIniciativa, { URL_FORMULARIO_POSTULACION: form.getPublishedUrl() }, { motivo: reemplazar ? 'Nuevo formulario desde plantilla documental' : 'Creación de formulario desde plantilla documental' });
+  
+  const sync = sincronizarMercadosEnFormularioUnico_();
+  const formUrl = sync.formUrl;
+  
+  repoActualizar('INICIATIVAS', idIniciativa, {
+    URL_FORMULARIO_POSTULACION: formUrl
+  }, { motivo: 'Asignación de Formulario Único Oficial de Postulaciones' });
+  
   return {
-    url: form.getPublishedUrl(),
-    editUrl: form.getEditUrl(),
-    id: form.getId(),
+    url: formUrl,
+    editUrl: sync.editUrl,
+    id: sync.formId,
     documentosConfigurados: true,
     faltantes: [],
-    formularioAnteriorCerrado: oldId || '',
-    plantillaRecuperadaDesde: recuperada ? recuperada.origen : ''
+    formularioAnteriorCerrado: '',
+    plantillaRecuperadaDesde: 'FORMULARIO_UNICO_MUNICIPAL',
+    mensaje: 'Mercado sincronizado exitosamente en el Formulario Único Oficial.'
   };
 }
 
@@ -937,10 +1002,29 @@ function procesarPostulacionMercadoFormulario(e) {
   const responseId = e && e.response && e.response.getId ? e.response.getId() : uuid_();
   try {
     conBloqueoSistema_(function() {
-      const formId = e && e.source && e.source.getId ? e.source.getId() : '';
-      const map = JSON.parse(PropertiesService.getScriptProperties().getProperty('SGE_FORM_MERCADO_MAP') || '{}');
-      const idIniciativa = map[formId];
-      exigir_(idIniciativa, 'FORMULARIO_NO_CONFIGURADO', 'No existe un mercado vinculado a este formulario.');
+      let idIniciativa = '';
+      const selected = answers['Mercado o Convocatoria a la que postula'] ||
+                       answers['Mercado o Convocatoria'] ||
+                       answers['Convocatoria'] ||
+                       answers['Feria o Mercado'];
+      if (selected) {
+        const match = String(selected).match(/\[ID:\s*([A-Za-z0-9_-]+)\]/);
+        if (match && match[1]) {
+          idIniciativa = match[1];
+        } else {
+          const todas = repoTodos('INICIATIVAS', { incluirInactivos: true });
+          const matchName = todas.find(function(i) {
+            return selected.indexOf(i.NOMBRE) >= 0 || String(i.NOMBRE).trim() === String(selected).trim();
+          });
+          if (matchName) idIniciativa = matchName.ID_INICIATIVA;
+        }
+      }
+      if (!idIniciativa) {
+        const formId = e && e.source && e.source.getId ? e.source.getId() : '';
+        const map = JSON.parse(PropertiesService.getScriptProperties().getProperty('SGE_FORM_MERCADO_MAP') || '{}');
+        idIniciativa = map[formId];
+      }
+      exigir_(idIniciativa, 'FORMULARIO_NO_CONFIGURADO', 'No se pudo identificar el mercado o convocatoria vinculado a la postulación.');
       const personaData = {
         RUT: answers['RUT'],
         NOMBRES: answers['Nombres'],
