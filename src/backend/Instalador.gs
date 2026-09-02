@@ -128,6 +128,50 @@ function vincularInstalacionDrive() {
 }
 
 /**
+ * Vincula una carpeta de una Unidad Compartida (Shared Drive) como la carpeta raíz documental del SGE.
+ * Crea automáticamente las subcarpetas de expedientes, iniciativas, actas y fichas integrales.
+ * 
+ * @param {string} idCarpetaOUnidadCompartida ID de la carpeta en la Unidad Compartida
+ */
+function configurarCarpetaUnidadCompartida(idCarpetaOUnidadCompartida) {
+  const rootId = (idCarpetaOUnidadCompartida || '').trim();
+  if (!rootId) {
+    throw new Error('Debe proporcionar el ID de la carpeta en la Unidad Compartida.');
+  }
+
+  const root = DriveApp.getFolderById(rootId);
+  const subcarpetas = [
+    'Expedientes_personas',
+    'Expedientes_emprendimientos',
+    'Fichas_integrales',
+    'Iniciativas',
+    'Actas_seleccion',
+    'Exportaciones'
+  ];
+
+  subcarpetas.forEach(function(name) {
+    carpetaHija_(root, name);
+  });
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(APP.PROP_ROOT_FOLDER_ID, root.getId());
+
+  Logger.log('=====================================================');
+  Logger.log('✅ CARPETA RAÍZ VINCULADA EN UNIDAD COMPARTIDA');
+  Logger.log('📁 Nombre: ' + root.getName());
+  Logger.log('🔗 URL: ' + root.getUrl());
+  Logger.log('🆔 ID: ' + root.getId());
+  Logger.log('=====================================================');
+
+  return respuestaOk({
+    mensaje: 'Carpeta en Unidad Compartida configurada exitosamente.',
+    nombreCarpeta: root.getName(),
+    url: root.getUrl(),
+    id: root.getId()
+  });
+}
+
+/**
  * Permite configurar o migrar los identificadores de base de datos, Drive y formularios.
  */
 function configurarPropiedadesSistema(dbId, rootFolderId, formUrl, formTemplateId) {
