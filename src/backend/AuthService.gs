@@ -19,8 +19,24 @@ function usuarioActual_() {
   const email = emailActual_();
   exigir_(email, 'SIN_IDENTIDAD', 'No fue posible obtener el correo institucional.');
   const users = repoListar('USUARIOS', { filtro: { EMAIL: email }, incluirInactivos: true, limit: 10 });
-  exigir_(users.length && String(users[0].ACTIVO).toUpperCase() !== 'NO', 'SIN_ACCESO', 'Usuario no autorizado.');
-  _usuarioActualCache = users[0];
+  if (users.length) {
+    exigir_(String(users[0].ACTIVO).toUpperCase() !== 'NO', 'SIN_ACCESO', 'Usuario deshabilitado en el sistema.');
+    _usuarioActualCache = users[0];
+    return _usuarioActualCache;
+  }
+  
+  // Auto-aprovisionamiento simplificado: Cualquier funcionario municipal entra automáticamente como GESTOR
+  const nuevoGestor = repoInsertar('USUARIOS', {
+    ID_USUARIO: uuid_(),
+    EMAIL: email,
+    NOMBRE: email.split('@')[0].replace(/[._]/g, ' ').toUpperCase(),
+    ROL: APP.ROLES.GESTOR,
+    ACTIVO: 'SI',
+    CREADO_EN: ahoraIso_(),
+    CREADO_POR: 'ACCESO_MUNICIPAL_DIRECTO'
+  }, { auditar: false });
+  
+  _usuarioActualCache = nuevoGestor;
   return _usuarioActualCache;
 }
 
