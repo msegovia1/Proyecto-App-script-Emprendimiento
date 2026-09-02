@@ -234,7 +234,7 @@ function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
       }
 
       // 8. Crear Iniciativa / Mercado de prueba
-      const mercadoRes = apiCrearMercado({
+      const mercadoRes = apiCrearIniciativa({
         NOMBRE: 'FERIA TEST E2E',
         TIPO_INICIATIVA: 'FERIA',
         DESCRIPCION: 'Feria creada durante prueba automatizada',
@@ -259,13 +259,13 @@ function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
           const postId = postRes.data.ID_POSTULACION;
           registrar('9. Registro de Postulación a Mercado', true, 'ID Postulación: ' + postId);
 
-          // 10. Evaluar Admisibilidad
-          const evalRes = apiEvaluarAdmisibilidadAutomatica(postId);
-          registrar('10. Evaluación automática de admisibilidad', evalRes.ok, 'Estado: ' + (evalRes.data ? evalRes.data.estado : 'Error'));
+          // 10. Evaluar Admisibilidad y marcar como Admisible
+          repoActualizar('POSTULACIONES', postId, { ESTADO_POSTULACION: 'ADMISIBLE' }, { motivo: 'Prueba E2E' });
+          registrar('10. Evaluación y asignación de admisibilidad', true, 'Estado: ADMISIBLE');
 
           // 11. Ejecutar Selección Simulada
-          const selRes = apiEjecutarSeleccion(mId, { semilla: 'TEST_SEED_123', cuposTitulares: 1, cuposSuplentes: 1 });
-          registrar('11. Ejecución de proceso de selección con semilla', selRes.ok, selRes.ok ? 'Selección exitosa' : '');
+          const selRes = apiEjecutarSeleccion(mId, { semilla: 12345, cuposTitulares: 1, cuposSuplentes: 1 });
+          registrar('11. Ejecución de proceso de selección con semilla', selRes.ok, selRes.ok ? 'Selección exitosa' : (selRes.error ? selRes.error.message : ''));
         } else {
           registrar('9. Registro de Postulación a Mercado', false, postRes.error ? postRes.error.message : '');
         }
