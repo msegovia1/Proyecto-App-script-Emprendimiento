@@ -1,0 +1,5 @@
+# Ignorar archivos consolidados generados localmente
+Code.gs
+Index.html
+.DS_Store
+*.log
