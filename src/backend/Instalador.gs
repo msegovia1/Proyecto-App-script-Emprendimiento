@@ -3,21 +3,41 @@
 // Instalación del sistema, vinculación de hojas/carpetas, diagnóstico y formularios
 
 function instalarSistema() {
-  const props = PropertiesService.getScriptProperties();
-  const existing = props.getProperty(APP.PROP_DB_ID);
-  if (existing) {
-    return respuestaOk({
-      mensaje: 'El sistema ya está instalado.',
-      diagnostico: diagnosticarInstalacion(),
-      spreadsheetId: existing
-    });
-  }
+  let db = null;
+  try {
+    db = SpreadsheetApp.getActiveSpreadsheet();
+  } catch (ignored) {}
 
-  const db = SpreadsheetApp.create('SGE - Base de datos institucional');
+  if (!db) {
+    db = SpreadsheetApp.create('SGE - Base de datos institucional');
+  }
+  
+  return estructurarBaseDeDatos_(db);
+}
+
+function instalarEnHojaActiva() {
+  const db = SpreadsheetApp.getActiveSpreadsheet();
+  if (!db) {
+    throw new Error('No hay una hoja de cálculo activa vinculada a este script. Utilice instalarSistema() para crear una nueva.');
+  }
+  return estructurarBaseDeDatos_(db);
+}
+
+function estructurarBaseDeDatos_(db) {
   db.setSpreadsheetTimeZone(APP.TIMEZONE);
-  const defaultSheet = db.getSheets()[0];
+  const existingSheets = db.getSheets();
+  const existingNames = existingSheets.map(function(s) { return s.getName(); });
+
   Object.keys(SCHEMA).forEach(function(name, index) {
-    const sheet = index === 0 ? defaultSheet.setName(name) : db.insertSheet(name);
+    let sheet;
+    if (existingNames.indexOf(name) >= 0) {
+      sheet = db.getSheetByName(name);
+    } else if (index === 0 && existingSheets.length === 1 && existingNames[0] === 'Hoja 1' || existingNames[0] === 'Sheet1') {
+      sheet = existingSheets[0].setName(name);
+    } else {
+      sheet = db.insertSheet(name);
+    }
+
     const headers = SCHEMA[name];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
@@ -25,10 +45,19 @@ function instalarSistema() {
     sheet.autoResizeColumns(1, headers.length);
   });
 
-  const root = DriveApp.createFolder('Sistema de Gestión de Emprendimientos');
-  ['Expedientes_personas', 'Expedientes_emprendimientos', 'Iniciativas', 'Actas_seleccion', 'Exportaciones'].forEach(function(name) {
-    root.createFolder(name);
-  });
+  const props = PropertiesService.getScriptProperties();
+  let root = null;
+  const rootId = props.getProperty(APP.PROP_ROOT_FOLDER_ID);
+  if (rootId) {
+    try { root = DriveApp.getFolderById(rootId); } catch (e) {}
+  }
+  if (!root) {
+    root = DriveApp.createFolder('Sistema de Gestión de Emprendimientos');
+    ['Expedientes_personas', 'Expedientes_emprendimientos', 'Iniciativas', 'Actas_seleccion', 'Exportaciones'].forEach(function(name) {
+      root.createFolder(name);
+    });
+  }
+
   props.setProperties({
     SGE_DB_ID: db.getId(),
     SGE_ROOT_FOLDER_ID: root.getId()
@@ -37,25 +66,29 @@ function instalarSistema() {
   cargarCatalogosIniciales_();
   cargarRolesIniciales_();
   const email = emailActual_();
-  repoInsertar('USUARIOS', {
-    ID_USUARIO: uuid_(),
-    EMAIL: email,
-    NOMBRE: email,
-    ROL: APP.ROLES.ADMIN,
-    ACTIVO: 'SI',
-    CREADO_EN: ahoraIso_(),
-    CREADO_POR: email
-  }, { auditar: false });
-  repoInsertar('CONFIGURACION', {
-    CLAVE: 'VERSION',
-    VALOR: APP.VERSION,
-    DESCRIPCION: 'Versión instalada',
-    ACTUALIZADO_EN: ahoraIso_(),
-    ACTUALIZADO_POR: email
-  }, { auditar: false });
-  auditoriaRegistrar_('INSTALAR', 'SISTEMA', APP.VERSION, null, { spreadsheetId: db.getId(), rootFolderId: root.getId() }, 'Instalación inicial');
+  
+  const existingUser = repoListar('USUARIOS', { filtro: { EMAIL: email }, incluirInactivos: true, limit: 5 });
+  if (!existingUser.length) {
+    repoInsertar('USUARIOS', {
+      ID_USUARIO: uuid_(),
+      EMAIL: email,
+      NOMBRE: email,
+      ROL: APP.ROLES.ADMIN,
+      ACTIVO: 'SI',
+      CREADO_EN: ahoraIso_(),
+      CREADO_POR: email
+    }, { auditar: false });
+  }
+
+  Logger.log('=====================================================');
+  Logger.log('✅ INSTALACIÓN COMPLETADA CON ÉXITO');
+  Logger.log('📊 Planilla de BD: ' + db.getUrl());
+  Logger.log('📁 Carpeta Drive: ' + root.getUrl());
+  Logger.log('👤 Usuario Administrador: ' + email);
+  Logger.log('=====================================================');
+
   return respuestaOk({
-    mensaje: 'Instalación completada.',
+    mensaje: 'Instalación completada exitosamente.',
     spreadsheetUrl: db.getUrl(),
     folderUrl: root.getUrl(),
     diagnostico: diagnosticarInstalacion()
