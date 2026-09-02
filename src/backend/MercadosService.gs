@@ -699,6 +699,12 @@ function crearPlantillaDocumentalDesdeFuente_(fuente, origen) {
 }
 
 function habilitarRespuestasFormulario_(form) {
+  try {
+    form.setRequireLogin(false);
+  } catch (ignored) {}
+  try {
+    form.setLimitOneResponsePerUser(false);
+  } catch (ignored) {}
   if (typeof form.supportsAdvancedResponderPermissions === 'function' && form.supportsAdvancedResponderPermissions()) {
     form.setPublished(true);
   }
@@ -853,7 +859,9 @@ function crearFormularioMercadoDesdePlantilla_(idIniciativa, reemplazar) {
   const oldId = reemplazar ? formIdMercado_(idIniciativa) : '';
   if (oldId) {
     try { cerrarRespuestasFormulario_(FormApp.openById(oldId)); } catch (ignored) {}
+    limpiarActivadorFormulario_(oldId);
   }
+  limpiarActivadoresHuerfanosMercados_();
   const targetFolder = carpetaFormulariosPublicos_();
   const copy = DriveApp.getFileById(templateId).makeCopy('Postulación a ' + iniciativa.NOMBRE, targetFolder);
   const form = FormApp.openById(copy.getId());
@@ -1067,5 +1075,79 @@ function procesarPostulacionMercadoFormulario(e) {
       }, { auditar: false });
     } catch (ignored) {}
     manejarError_(error, 'procesarPostulacionMercadoFormulario');
+  }
+}
+
+/**
+ * Elimina el activador (trigger) asociado a un formulario específico.
+ */
+function limpiarActivadorFormulario_(formId) {
+  if (!formId) return;
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction() === 'procesarPostulacionMercadoFormulario') {
+        try {
+          if (t.getTriggerSourceId() === formId) {
+            ScriptApp.deleteTrigger(t);
+          }
+        } catch (ignored) {}
+      }
+    });
+  } catch (e) {
+    console.warn('Error al limpiar activador para formId ' + formId + ': ' + e);
+  }
+}
+
+/**
+ * Revisa todos los activadores de formularios de mercados y elimina aquellos
+ * que correspondan a mercados cerrados, finalizados, cancelados o inexistentes.
+ */
+function limpiarActivadoresHuerfanosMercados_() {
+  const props = PropertiesService.getScriptProperties();
+  const map = JSON.parse(props.getProperty('SGE_FORM_MERCADO_MAP') || '{}');
+  const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: true });
+  const mapIniciativas = indexarPor_(iniciativas, 'ID_INICIATIVA');
+  const triggers = ScriptApp.getProjectTriggers();
+  
+  let eliminados = 0;
+  const nuevoMap = Object.assign({}, map);
+  const estadosCerrados = ['CERRADA', 'FINALIZADA', 'CANCELADA', 'EJECUTADA', 'HISTORICA'];
+
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'procesarPostulacionMercadoFormulario') {
+      try {
+        const formId = t.getTriggerSourceId();
+        const idIniciativa = map[formId];
+        const iniciativa = idIniciativa ? mapIniciativas[idIniciativa] : null;
+        
+        const debeEliminar = !iniciativa || estadosCerrados.indexOf(iniciativa.ESTADO) >= 0;
+        if (debeEliminar) {
+          ScriptApp.deleteTrigger(t);
+          eliminados++;
+          if (formId && nuevoMap[formId]) {
+            delete nuevoMap[formId];
+          }
+        }
+      } catch (ignored) {}
+    }
+  });
+
+  props.setProperty('SGE_FORM_MERCADO_MAP', JSON.stringify(nuevoMap));
+  return {
+    eliminados: eliminados,
+    totalTriggersActuales: ScriptApp.getProjectTriggers().length
+  };
+}
+
+/**
+ * API RPC para ejecutar la limpieza de activadores bajo demanda o desde mantenimiento.
+ */
+function apiLimpiarActivadoresMercados() {
+  try {
+    exigirPermiso_('INICIATIVA_EDITAR');
+    return respuestaOk(limpiarActivadoresHuerfanosMercados_());
+  } catch (error) {
+    return manejarError_(error, 'apiLimpiarActivadoresMercados');
   }
 }

@@ -106,6 +106,19 @@ function apiCambiarEstadoIniciativa(id, estado, motivo) {
     exigir_(actual, 'NO_ENCONTRADO', 'Iniciativa no encontrada.');
     const aperturaFutura = estado === 'ABIERTA' && actual.APERTURA_POSTULACION && new Date(actual.APERTURA_POSTULACION) > new Date();
     const result = repoActualizar('INICIATIVAS', id, { ESTADO: estado }, { motivo: motivo });
+    const estadosCerrados = ['CERRADA', 'FINALIZADA', 'CANCELADA', 'EJECUTADA', 'HISTORICA'];
+    if (estadosCerrados.indexOf(estado) >= 0) {
+      try {
+        const formId = formIdMercado_(id);
+        if (formId) {
+          try {
+            const form = FormApp.openById(formId);
+            if (form) cerrarRespuestasFormulario_(form);
+          } catch (ignored) {}
+          limpiarActivadorFormulario_(formId);
+        }
+      } catch (ignored) {}
+    }
     return respuestaOk({
       iniciativa: result,
       advertencia: aperturaFutura ? 'La iniciativa fue abierta antes de la fecha programada. La excepción quedó auditada.' : ''
