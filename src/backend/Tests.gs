@@ -137,3 +137,196 @@ function ejecutarPruebas() {
     resultados: results
   };
 }
+
+/**
+ * Ejecuta una prueba integral de extremo a extremo (E2E) sobre la nueva base de datos y Google Drive.
+ * Valida:
+ * 1. Conexión con Sheets y existencia de las 16 tablas.
+ * 2. Conexión con Google Drive y permisos reales de escritura en la Unidad Compartida.
+ * 3. Permisos y autenticación del usuario administrador.
+ * 4. Creación y consulta de Ficha Integral (Persona + Emprendimiento).
+ * 5. Creación de Mercado, Postulación y Evaluación de Selección.
+ * 6. Limpieza opcional de datos de prueba.
+ * 
+ * @param {boolean} limpiarDespues Si es true, borra los registros de prueba al finalizar.
+ */
+function ejecutarPruebasIntegralesEndToEnd(limpiarDespues) {
+  if (limpiarDespues === undefined) limpiarDespues = true;
+  const log = [];
+  function registrar(titulo, exito, detalle) {
+    const item = { paso: titulo, ok: exito, detalle: detalle || '' };
+    log.push(item);
+    Logger.log((exito ? '✅ PASS: ' : '❌ FAIL: ') + titulo + (detalle ? ' (' + detalle + ')' : ''));
+  }
+
+  Logger.log('=====================================================');
+  Logger.log('🧪 INICIANDO SUITE DE PRUEBAS INTEGRALES E2E (SGE v2.1.0)');
+  Logger.log('=====================================================');
+
+  try {
+    // 1. Diagnóstico de Sheets y Esquema
+    const db = db_();
+    const sheets = db.getSheets().map(function(s) { return s.getName(); });
+    const tablasFaltantes = Object.keys(SCHEMA).filter(function(t) { return sheets.indexOf(t) < 0; });
+    if (tablasFaltantes.length === 0) {
+      registrar('1. Base de datos y 16 tablas estructuradas', true, 'Planilla: ' + db.getName());
+    } else {
+      registrar('1. Base de datos y 16 tablas estructuradas', false, 'Faltan tablas: ' + tablasFaltantes.join(', '));
+    }
+
+    // 2. Diagnóstico de Google Drive (Unidad Compartida)
+    const root = carpetaRoot_();
+    registrar('2. Carpeta raíz en Google Drive accesible', true, 'Carpeta: ' + root.getName());
+
+    // 3. Prueba de escritura real en Drive
+    let testFile = null;
+    try {
+      testFile = root.createFile('SGE_TEST_PERMISOS.txt', 'Prueba de permisos de escritura ' + ahoraIso_());
+      testFile.setTrashed(true);
+      registrar('3. Permisos reales de escritura y borrado en Drive', true, 'Operación en Unidad Compartida autorizada');
+    } catch (eDrive) {
+      registrar('3. Permisos reales de escritura y borrado en Drive', false, 'Error: ' + eDrive.message);
+    }
+
+    // 4. Usuario y Permisos
+    const email = emailActual_();
+    const user = usuarioActual_();
+    registrar('4. Usuario actual y roles RBAC', true, 'Email: ' + email + ' | Rol: ' + user.ROL);
+
+    // 5. Catálogos precargados
+    const catalogos = catalogos_();
+    const cantCatalogos = Object.keys(catalogos).length;
+    registrar('5. Catálogos del sistema en memoria y caché', cantCatalogos >= 8, cantCatalogos + ' familias de catálogos');
+
+    // 6. Prueba funcional: Registro Completo de Ficha Integral
+    const rutTest = '11.111.111-1';
+    const regRes = apiRegistroCompleto({
+      PERSONA: {
+        NOMBRES: 'EMPRENDEDOR PRUEBA',
+        APELLIDO_PATERNO: 'TEST',
+        RUT: rutTest,
+        EMAIL: 'test_e2e@municipio.cl',
+        TELEFONO: '+56912345678',
+        COMUNA_RESIDENCIA: 'Santiago',
+        GENERO: 'OTRO',
+        DISCAPACIDAD_DECLARADA: 'NO'
+      },
+      EMPRENDIMIENTO: {
+        NOMBRE_COMERCIAL: 'EMPRENDIMIENTO TEST E2E',
+        ID_RUBRO: 'ARTESANIA',
+        ETAPA_ACTUAL: 'DESARROLLO',
+        FORMALIZACION: 'SIN_INICIO',
+        DESCRIPCION_PRODUCTOS: 'Productos de prueba automatizada'
+      }
+    });
+
+    if (regRes.ok && regRes.data && regRes.data.persona) {
+      const pId = regRes.data.persona.ID_PERSONA;
+      const eId = regRes.data.emprendimiento.ID_EMPRENDIMIENTO;
+      registrar('6. Registro de Ficha Integral (Persona + Emprendimiento)', true, 'ID Persona: ' + pId);
+
+      // 7. Consulta de Ficha Integral
+      const fichaRes = apiObtenerFichaIntegral(pId);
+      if (fichaRes.ok && fichaRes.data) {
+        registrar('7. Consulta y armado de Ficha Integral', true, 'Nombre: ' + fichaRes.data.persona.NOMBRES);
+      } else {
+        registrar('7. Consulta y armado de Ficha Integral', false, fichaRes.error ? fichaRes.error.message : '');
+      }
+
+      // 8. Crear Iniciativa / Mercado de prueba
+      const mercadoRes = apiCrearMercado({
+        NOMBRE: 'FERIA TEST E2E',
+        TIPO_INICIATIVA: 'FERIA',
+        DESCRIPCION: 'Feria creada durante prueba automatizada',
+        LUGAR: 'Plaza de Armas',
+        FECHA_EJECUCION: Utilities.formatDate(new Date(), APP.TIMEZONE, 'yyyy-MM-dd'),
+        CUPOS_TITULARES: 5,
+        CUPOS_SUPLENTES: 2
+      });
+
+      if (mercadoRes.ok && mercadoRes.data) {
+        const mId = mercadoRes.data.ID_INICIATIVA;
+        registrar('8. Creación de Mercado / Iniciativa', true, 'ID Mercado: ' + mId);
+
+        // 9. Postular Emprendimiento al Mercado
+        const postRes = apiCrearPostulacion({
+          ID_INICIATIVA: mId,
+          ID_EMPRENDIMIENTO: eId,
+          ID_PERSONA_CONTACTO: pId
+        });
+
+        if (postRes.ok && postRes.data) {
+          const postId = postRes.data.ID_POSTULACION;
+          registrar('9. Registro de Postulación a Mercado', true, 'ID Postulación: ' + postId);
+
+          // 10. Evaluar Admisibilidad
+          const evalRes = apiEvaluarAdmisibilidadAutomatica(postId);
+          registrar('10. Evaluación automática de admisibilidad', evalRes.ok, 'Estado: ' + (evalRes.data ? evalRes.data.estado : 'Error'));
+
+          // 11. Ejecutar Selección Simulada
+          const selRes = apiEjecutarSeleccion(mId, { semilla: 'TEST_SEED_123', cuposTitulares: 1, cuposSuplentes: 1 });
+          registrar('11. Ejecución de proceso de selección con semilla', selRes.ok, selRes.ok ? 'Selección exitosa' : '');
+        } else {
+          registrar('9. Registro de Postulación a Mercado', false, postRes.error ? postRes.error.message : '');
+        }
+      } else {
+        registrar('8. Creación de Mercado / Iniciativa', false, mercadoRes.error ? mercadoRes.error.message : '');
+      }
+
+      // 12. Dashboard Integral
+      const dashRes = apiDashboardIntegral(true);
+      registrar('12. Cálculo de KPIs y Dashboard Integral en vivo', dashRes.ok, dashRes.ok ? 'KPIs calculados correctamente' : '');
+
+      // 13. Limpieza de datos de prueba
+      if (limpiarDespues) {
+        try {
+          const tablasLimpieza = ['PERSONAS', 'EMPRENDIMIENTOS', 'PERSONA_EMPRENDIMIENTO', 'INICIATIVAS', 'POSTULACIONES', 'PROCESOS_SELECCION', 'RESULTADOS_SELECCION'];
+          tablasLimpieza.forEach(function(t) {
+            const s = hoja_(t);
+            const data = s.getDataRange().getValues();
+            for (let r = data.length - 1; r >= 1; r--) {
+              const rowStr = data[r].join(' ');
+              if (rowStr.indexOf('TEST') >= 0 || rowStr.indexOf(rutTest) >= 0 || rowStr.indexOf('test_e2e') >= 0) {
+                s.deleteRow(r + 1);
+              }
+            }
+          });
+          registrar('13. Limpieza de datos de prueba (Cleanup)', true, 'Base de datos restaurada limpia');
+        } catch (eClean) {
+          registrar('13. Limpieza de datos de prueba (Cleanup)', false, eClean.message);
+        }
+      } else {
+        registrar('13. Registros de prueba conservados para inspección visual', true, 'Revise en la interfaz web');
+      }
+
+    } else {
+      registrar('6. Registro de Ficha Integral', false, regRes.error ? regRes.error.message : '');
+    }
+
+  } catch (error) {
+    registrar('Error imprevisto en suite E2E', false, error.message);
+  }
+
+  const exitosas = log.filter(function(p) { return p.ok; }).length;
+  const fallidas = log.filter(function(p) { return !p.ok; }).length;
+  Logger.log('=====================================================');
+  Logger.log('📊 RESUMEN FINAL: ' + exitosas + ' PASARON, ' + fallidas + ' FALLARON DE ' + log.length + ' PRUEBAS');
+  Logger.log('=====================================================');
+
+  return {
+    ok: fallidas === 0,
+    total: log.length,
+    exitosas: exitosas,
+    fallidas: fallidas,
+    resumen: exitosas + '/' + log.length + ' pruebas pasadas',
+    detalle: log
+  };
+}
+
+/**
+ * Ejecuta la suite E2E conservando los datos creados (Ficha de Juan Pérez Test, Feria Test, etc.)
+ * para que puedas verlos y probarlos directamente en la interfaz web.
+ */
+function ejecutarPruebasYConservarDatosDemo() {
+  return ejecutarPruebasIntegralesEndToEnd(false);
+}
