@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= appName ?></title>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <?!= include_('Styles') ?>
+</head>
+<body>
+  <div id="loading" class="loading">Iniciando <?= appName ?>…</div>
+  <div id="alert" class="alert hidden" role="alert" aria-live="polite"></div>
+  <div id="busy" class="busy-overlay hidden" aria-live="assertive">
+    <div class="busy-card">
+      <div class="spinner"></div>
+      <span id="busyText">Procesando…</span>
+    </div>
+  </div>
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">SGE</div>
+        <div>
+          <strong><?= appName ?></strong>
+          <small>Municipalidad de Santiago</small>
+        </div>
+      </div>
+      <nav aria-label="Navegación principal">
+        <button data-view="inicio" class="active" aria-label="Ir a Panel de gestión">📊 Panel de gestión</button>
+        <button data-view="registro" aria-label="Registrar nueva persona y emprendimiento">➕ Nuevo registro</button>
+        <button data-view="buscar" aria-label="Buscador general">🔍 Buscador</button>
+        <button data-view="emprendedores" aria-label="Consultar fichas integrales">👥 Emprendedores</button>
+        <button data-view="iniciativas" aria-label="Gestionar mercados y convocatorias">🎪 Mercados</button>
+        <button data-view="postulaciones" aria-label="Revisar postulaciones">📋 Postulaciones</button>
+        <button data-view="seleccion" aria-label="Selección manual de postulaciones">⚖️ Selección</button>
+        <button data-view="participacion" aria-label="Seguimiento de asistencia y ventas">📈 Seguimiento</button>
+        <button data-view="comunicaciones" aria-label="Preparar comunicaciones">✉️ Comunicaciones</button>
+        <button data-view="documentos" aria-label="Expedientes documentales">📁 Documentos</button>
+        <button data-view="auditoria" aria-label="Auditoría y trazabilidad">🛡️ Auditoría</button>
+      </nav>
+      <div class="version">Versión <?= version ?></div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <h1 id="viewTitle">Panel de gestión</h1>
+          <p id="viewSubtitle">Sistema de Gestión de Emprendimientos</p>
+        </div>
+        <div class="user-badge" id="userBadge" aria-label="Usuario actual">Cargando usuario…</div>
+      </header>
+      <section id="view" aria-live="polite"></section>
+    </main>
+  </div>
+  <?!= include_('Scripts') ?>
+</body>
+</html>
