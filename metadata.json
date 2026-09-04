@@ -1,0 +1,8 @@
+{
+  "name": "Sistema de Gestión de Emprendimientos",
+  "description": "Sistema de gestión integral para emprendedores, ferias, convocatorias y expedientes documentales - Municipalidad de Santiago",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

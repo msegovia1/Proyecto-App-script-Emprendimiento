@@ -1,28 +1,30 @@
 <style>
   :root {
-    --navy: #0f2942;
-    --blue: #1b629b;
-    --sky: #2563eb;
-    --indigo: #4f46e5;
+    --navy: #002b49;
+    --navy-light: #0f3d63;
+    --blue: #005a9c;
+    --sky: #0284c7;
+    --indigo: #4338ca;
     --teal: #0d9488;
     --emerald: #059669;
     --coral: #ea580c;
     --violet: #7c3aed;
-    --amber: #d97706;
+    --amber: #c59b27;
+    --gold: #d4af37;
     --rose: #e11d48;
     --cyan: #0284c7;
     --pale: #f0f7ff;
     --bg: #f8fafc;
     --card-bg: #ffffff;
     --line: #e2e8f0;
-    --text: #1e293b;
+    --text: #0f172a;
     --muted: #64748b;
     --good: #10b981;
     --warn: #f59e0b;
     --bad: #ef4444;
-    --shadow-sm: 0 2px 6px rgba(15, 41, 66, 0.06);
-    --shadow-md: 0 4px 14px rgba(15, 41, 66, 0.10);
-    --shadow-lg: 0 16px 40px rgba(15, 41, 66, 0.20);
+    --shadow-sm: 0 1px 3px rgba(0, 43, 73, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 43, 73, 0.08);
+    --shadow-lg: 0 12px 32px rgba(0, 43, 73, 0.15);
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
@@ -885,108 +887,6 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-  }
-
-  /* Asistente de Pre-Filtro y Diagnóstico por Rubro */
-  .prefilter-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--radius-md);
-    padding: 16px 20px;
-    margin: 16px 0;
-  }
-
-  .prefilter-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .prefilter-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--navy);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .prefilter-stats {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    font-size: 13px;
-    color: var(--text);
-  }
-
-  .prefilter-stat-badge {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: var(--radius-sm);
-    padding: 4px 10px;
-    font-weight: 600;
-  }
-
-  .prefilter-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-  }
-
-  .chip-rubro {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    color: var(--navy);
-    font-size: 12px;
-    font-weight: 600;
-    padding: 5px 10px;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .chip-rubro:hover {
-    border-color: var(--blue);
-    background: #f0f7ff;
-  }
-
-  .chip-rubro.active {
-    background: var(--navy);
-    color: #ffffff;
-    border-color: var(--navy);
-  }
-
-  .chip-rubro .chip-count {
-    background: #e2e8f0;
-    color: #334155;
-    border-radius: var(--radius-full);
-    padding: 1px 6px;
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .chip-rubro.active .chip-count {
-    background: rgba(255, 255, 255, 0.25);
-    color: #ffffff;
-  }
-
-  .badge-suggested {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    display: inline-block;
-    margin-top: 4px;
   }
 
   /* Modal de métricas de seguimiento */

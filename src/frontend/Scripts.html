@@ -108,18 +108,27 @@
   async function init() {
     try {
       state.boot = assertOk(await call('apiBootstrap'));
-      $('#userBadge').textContent = state.boot.usuario.EMAIL + ' · ' + state.boot.usuario.ROL;
-      $('#loading').classList.add('hidden');
-      $('#app').classList.remove('hidden');
-      render('inicio');
+      const ub = $('#userBadge');
+      if (ub && state.boot && state.boot.usuario) {
+        ub.textContent = (state.boot.usuario.EMAIL || '') + ' · ' + (state.boot.usuario.ROL || '');
+      }
+      const ld = $('#loading');
+      if (ld) ld.classList.add('hidden');
+      const ap = $('#app');
+      if (ap) ap.classList.remove('hidden');
+      if ($('#view') && typeof render === 'function') {
+        render('inicio');
+      }
     } catch (error) {
-      $('#loading').textContent = 'No fue posible iniciar el sistema: ' + error.message;
+      const ld = $('#loading');
+      if (ld) ld.textContent = 'No fue posible iniciar el sistema: ' + error.message;
+      console.warn('apiBootstrap notice:', error);
     }
   }
 
   document.addEventListener('click', function(e) {
     const button = e.target.closest('[data-view]');
-    if (button) render(button.dataset.view);
+    if (button && typeof render === 'function') render(button.dataset.view);
   });
 
   function setActive(view, title) {
@@ -127,7 +136,8 @@
     document.querySelectorAll('[data-view]').forEach(function(b) {
       b.classList.toggle('active', b.dataset.view === view);
     });
-    $('#viewTitle').textContent = title;
+    const vt = $('#viewTitle');
+    if (vt) vt.textContent = title;
   }
 
   function render(view) {
@@ -1285,8 +1295,10 @@
       renderFichaIntegral(saved.ID_PERSONA);
     } catch (e) {
       alertMsg(e.message, 'error');
-      button.disabled = false;
-      button.textContent = id ? 'Guardar cambios' : 'Crear persona';
+      if (button) {
+        button.disabled = false;
+        button.textContent = id ? 'Guardar cambios' : 'Crear persona';
+      }
     }
   }
 
@@ -1449,8 +1461,10 @@
       renderFichaIntegral(saved.ID_EMPRENDIMIENTO);
     } catch (e) {
       alertMsg(e.message, 'error');
-      button.disabled = false;
-      button.textContent = id ? 'Guardar cambios' : 'Crear emprendimiento';
+      if (button) {
+        button.disabled = false;
+        button.textContent = id ? 'Guardar cambios' : 'Crear emprendimiento';
+      }
     }
   }
 
@@ -1615,15 +1629,19 @@
     if (!file) return alertMsg('Seleccione un archivo.', 'error');
     if (file.size > 10 * 1024 * 1024) return alertMsg('El archivo supera 10 MB.', 'error');
     try {
-      button.disabled = true;
-      button.textContent = 'Cargando…';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Cargando…';
+      }
       assertOk(await callForm('apiCargarDocumentoFormulario', form));
       alertMsg('Documento cargado correctamente.');
       renderExpediente(tipo, id, label);
     } catch (e) {
       alertMsg(e.message, 'error');
-      button.disabled = false;
-      button.textContent = 'Cargar documento';
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Cargar documento';
+      }
     }
   }
 
@@ -1832,8 +1850,10 @@
   async function saveIniciativa(id) {
     const b = $('#saveInitiative');
     try {
-      b.disabled = true;
-      b.textContent = 'Guardando…';
+      if (b) {
+        b.disabled = true;
+        b.textContent = 'Guardando…';
+      }
       const data = Object.fromEntries(new FormData($('#initiativeForm')).entries());
       const saved = assertOk(await call(id ? 'apiActualizarIniciativa' : 'apiCrearMercadoIntegral', ...(id ? [id, data] : [data])));
       const item = id ? saved : saved.iniciativa;
@@ -1841,8 +1861,10 @@
       renderIniciativaDetalle(item.ID_INICIATIVA);
     } catch (e) {
       alertMsg(e.message, 'error');
-      b.disabled = false;
-      b.textContent = id ? 'Guardar cambios' : 'Crear iniciativa';
+      if (b) {
+        b.disabled = false;
+        b.textContent = id ? 'Guardar cambios' : 'Crear iniciativa';
+      }
     }
   }
 
@@ -2564,23 +2586,9 @@
           <div class="panel-head">
             <div>
               <h2>⚖️ Selección simplificada de postulaciones</h2>
-              <p class="muted">Asistente de pre-filtro y selección balanceada por rubro, rotación y mérito.</p>
+              <p class="muted">Priorice, filtre y seleccione postulantes de manera ágil y transparente.</p>
             </div>
           </div>
-
-          <div id="v2PrefilterBox" class="prefilter-card" style="display:none;">
-            <div class="prefilter-header">
-              <div class="prefilter-title">
-                <span>🎯 Asistente de Pre-Filtro y Cuotas por Rubro</span>
-              </div>
-              <div id="v2PrefilterStats" class="prefilter-stats"></div>
-            </div>
-            <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">
-              Haga clic en un rubro para filtrar la tabla o presione <strong>"Pre-selección inteligente"</strong> para balancear cupos automáticamente:
-            </div>
-            <div id="v2RubroChips" class="prefilter-chips"></div>
-          </div>
-
           <div class="filters">
             <select id="v2Market" style="min-width:280px">
               ${ms.map(function(i) { return `<option value="${escapeHtml(i.ID_INICIATIVA)}" data-tit="${i.CUPOS_TITULARES || 0}" data-sup="${i.CUPOS_SUPLENTES || 0}">${escapeHtml(i.NOMBRE)} · ${escapeHtml(dateValue(i.FECHA_EJECUCION) || 'sin fecha')}</option>`; }).join('')}
@@ -2608,7 +2616,6 @@
               <span>0 postulaciones marcadas (0 titulares, 0 suplentes)</span>
             </div>
             <div class="selection-actions">
-              <button class="btn btn-primary btn-small" id="v2SmartPreselect" title="Calcula una distribución balanceada de cupos respetando diversidad de rubros y rotación justa (1ª vez)">⚡ Pre-selección inteligente (Rubros + Rotación)</button>
               <button class="btn btn-secondary btn-small" id="v2SelectTopTit">⚡ Auto-marcar primeros N titulares</button>
               <button class="btn btn-secondary btn-small" id="v2SelectAll">☑️ Marcar todos</button>
               <button class="btn btn-link btn-small" id="v2ClearSelection">Limpiar selección</button>
@@ -2663,55 +2670,6 @@
       $('#v2Save').onclick = saveSelectionV2;
       $('#v2Confirm').onclick = function() { renderConfirmaciones($('#v2Market').value); };
 
-      $('#v2SmartPreselect').onclick = async function() {
-        const b = $('#v2SmartPreselect');
-        const mId = $('#v2Market').value;
-        const tit = Math.max(0, Number($('#v2Tit').value || 0));
-        const sup = Math.max(0, Number($('#v2Sup').value || 0));
-        if (!tit && !sup) return alertMsg('Indique al menos 1 cupo titular o suplente.', 'warn');
-        try {
-          b.disabled = true;
-          b.textContent = 'Calculando pre-selección inteligente…';
-          const r = assertOk(await call('apiDiagnosticoYPreseleccionMercado', mId, {
-            calcularSugerencia: true,
-            cuposTitulares: tit,
-            cuposSuplentes: sup,
-            soloHabilitados: true
-          }));
-          if (r && r.sugerencia) {
-            const allSugg = [].concat(r.sugerencia.titularesIds || [], r.sugerencia.suplentesIds || []);
-            const checks = Array.from(document.querySelectorAll('.v2Check'));
-            checks.forEach(function(c) {
-              c.checked = allSugg.indexOf(c.value) >= 0;
-            });
-            // Decorar filas con badges de motivo de pre-filtro
-            document.querySelectorAll('.v2-sugg-badge').forEach(function(el) { el.remove(); });
-            Object.keys(r.sugerencia.motivos || {}).forEach(function(pId) {
-              const chk = document.querySelector(`.v2Check[value="${pId}"]`);
-              if (chk) {
-                const tr = chk.closest('tr');
-                if (tr) {
-                  const tdEmp = tr.querySelectorAll('td')[1];
-                  if (tdEmp) {
-                    const badge = document.createElement('div');
-                    badge.className = 'v2-sugg-badge badge-suggested';
-                    badge.textContent = '⭐ Sugerido: ' + r.sugerencia.motivos[pId];
-                    tdEmp.appendChild(badge);
-                  }
-                }
-              }
-            });
-            updateCounter();
-            alertMsg(`✨ Pre-selección inteligente aplicada: ${allSugg.length} emprendedores pre-marcados respetando diversidad de rubro y rotación.`);
-          }
-        } catch (e) {
-          alertMsg(e.message, 'error');
-        } finally {
-          b.disabled = false;
-          b.textContent = '⚡ Pre-selección inteligente (Rubros + Rotación)';
-        }
-      };
-
       $('#v2SelectTopTit').onclick = function() {
         const tit = Math.max(0, Number($('#v2Tit').value || 0));
         const checks = Array.from(document.querySelectorAll('.v2Check'));
@@ -2726,7 +2684,6 @@
 
       $('#v2ClearSelection').onclick = function() {
         document.querySelectorAll('.v2Check').forEach(function(c) { c.checked = false; });
-        document.querySelectorAll('.v2-sugg-badge').forEach(function(el) { el.remove(); });
         updateCounter();
       };
 
@@ -2739,45 +2696,13 @@
   async function loadSelectionV2(onUpdate) {
     const t = $('#v2Rows'), id = $('#v2Market').value;
     try {
-      // Cargar candidatos y diagnóstico en paralelo
-      const [rows, diagRes] = await Promise.all([
-        call('apiCandidatosPostulacionesMercado', id, {
-          q: $('#v2Q').value,
-          RUBRO: $('#v2Rubro').value,
-          FORMALIZACION: $('#v2Formal').value,
-          orden: $('#v2Sort').value
-        }),
-        call('apiDiagnosticoYPreseleccionMercado', id, {})
-      ]);
-
-      const candidatos = assertOk(rows);
-      const diag = (diagRes && diagRes.ok) ? diagRes.data : null;
-
-      // Renderizar Diagnóstico de Rubros en el asistente
-      if (diag && $('#v2PrefilterBox')) {
-        $('#v2PrefilterBox').style.display = 'block';
-        $('#v2PrefilterStats').innerHTML = `
-          <span class="prefilter-stat-badge">📋 Total postulantes: <strong>${diag.totalPostulaciones}</strong></span>
-          <span class="prefilter-stat-badge">✅ Habilitados: <strong>${diag.totalHabilitados}</strong></span>
-          <span class="prefilter-stat-badge">⭐ 1ª postulación (Rotación): <strong>${diag.totalPrimeraVez}</strong></span>
-        `;
-        const activeRubro = $('#v2Rubro').value || '';
-        const chipsHtml = [`<span class="chip-rubro ${activeRubro === '' ? 'active' : ''}" data-chip-rubro="">Todos (${diag.totalPostulaciones})</span>`];
-        Object.keys(diag.resumenRubros || {}).forEach(function(rk) {
-          const rInfo = diag.resumenRubros[rk];
-          const isAct = activeRubro === rk;
-          chipsHtml.push(`<span class="chip-rubro ${isAct ? 'active' : ''}" data-chip-rubro="${escapeHtml(rk)}">${escapeHtml(labelCodeText(rk))} <span class="chip-count">${rInfo.total}</span></span>`);
-        });
-        $('#v2RubroChips').innerHTML = chipsHtml.join('');
-        $('#v2RubroChips').querySelectorAll('.chip-rubro').forEach(function(chip) {
-          chip.onclick = function() {
-            $('#v2Rubro').value = chip.dataset.chipRubro || '';
-            loadSelectionV2(onUpdate);
-          };
-        });
-      }
-
-      t.innerHTML = candidatos.length ? `
+      const rows = assertOk(await call('apiCandidatosPostulacionesMercado', id, {
+        q: $('#v2Q').value,
+        RUBRO: $('#v2Rubro').value,
+        FORMALIZACION: $('#v2Formal').value,
+        orden: $('#v2Sort').value
+      }));
+      t.innerHTML = rows.length ? `
         <div class="table-wrap">
           <table>
             <thead>
@@ -2793,7 +2718,7 @@
               </tr>
             </thead>
             <tbody>
-              ${candidatos.map(function(r) {
+              ${rows.map(function(r) {
                 const badgeHist = r.PARTICIPACIONES_PREVIAS === 0
                   ? '<span class="badge-priority">⭐ 1ª postulación (Prioritario)</span>'
                   : `<span class="badge-history">🔄 ${r.PARTICIPACIONES_PREVIAS} ferias previas</span>`;
@@ -3144,23 +3069,27 @@
     document.body.appendChild(overlay);
 
     const calcSeg = function() {
-      const a = Number(overlay.querySelector('#tmSegAntes').value || 0);
-      const d = Number(overlay.querySelector('#tmSegDespues').value || 0);
+      const a = Number(overlay.querySelector('#tmSegAntes')?.value || 0);
+      const d = Number(overlay.querySelector('#tmSegDespues')?.value || 0);
       const diff = d - a;
       const el = overlay.querySelector('#tmSegCalc');
-      if (diff > 0) {
-        el.className = 'follower-calc-badge follower-calc-positive';
-        el.textContent = `+${diff} seguidores ganados 🎉`;
-      } else if (diff < 0) {
-        el.className = 'follower-calc-badge follower-calc-neutral';
-        el.textContent = `${diff} seguidores`;
-      } else {
-        el.className = 'follower-calc-badge follower-calc-neutral';
-        el.textContent = 'Sin variación';
+      if (el) {
+        if (diff > 0) {
+          el.className = 'follower-calc-badge follower-calc-positive';
+          el.textContent = `+${diff} seguidores ganados 🎉`;
+        } else if (diff < 0) {
+          el.className = 'follower-calc-badge follower-calc-neutral';
+          el.textContent = `${diff} seguidores`;
+        } else {
+          el.className = 'follower-calc-badge follower-calc-neutral';
+          el.textContent = 'Sin variación';
+        }
       }
     };
-    overlay.querySelector('#tmSegAntes').oninput = calcSeg;
-    overlay.querySelector('#tmSegDespues').oninput = calcSeg;
+    const inAntes = overlay.querySelector('#tmSegAntes');
+    const inDespues = overlay.querySelector('#tmSegDespues');
+    if (inAntes) inAntes.oninput = calcSeg;
+    if (inDespues) inDespues.oninput = calcSeg;
     calcSeg();
 
     overlay.querySelector('#tmCancelBtn').onclick = function() { overlay.remove(); };
@@ -3487,6 +3416,2993 @@
     update();
   }
 
-  // Inicializar al cargar el DOM
-  init();
+  // ==========================================
+  // CONTROLADORES MUNICIPALES SGE v2.1
+  // ==========================================
+
+  window.mostrarToast = function(mensaje, tipo = 'info') {
+    const area = document.getElementById('toastArea');
+    if (!area) return;
+    const toast = document.createElement('div');
+    const colorBg = tipo === 'success' ? 'bg-emerald-700 text-white' : (tipo === 'error' ? 'bg-red-700 text-white' : 'bg-slate-800 text-white');
+    toast.className = `px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 border border-white/10 transition-all transform duration-300 pointer-events-auto ${colorBg}`;
+    toast.innerHTML = `<span>${tipo === 'success' ? '✓' : (tipo === 'error' ? '✕' : 'ℹ')}</span><span>${escapeHtml(mensaje)}</span>`;
+    area.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  };
+
+  window.cambiarSeccion = function(seccion) {
+    const secciones = ['dashboard', 'fichas', 'nuevo', 'iniciativas', 'seleccion', 'seguimiento', 'expediente', 'turso'];
+    secciones.forEach(s => {
+      const el = document.getElementById('view' + s.charAt(0).toUpperCase() + s.slice(1));
+      if (el) el.classList.add('hidden');
+      const btn = document.getElementById('navBtn' + s.charAt(0).toUpperCase() + s.slice(1));
+      if (btn) {
+        btn.classList.remove('bg-muni-700', 'text-white', 'font-semibold');
+        btn.classList.add('text-blue-100');
+      }
+    });
+
+    const targetEl = document.getElementById('view' + seccion.charAt(0).toUpperCase() + seccion.slice(1));
+    if (targetEl) targetEl.classList.remove('hidden');
+
+    const targetBtn = document.getElementById('navBtn' + seccion.charAt(0).toUpperCase() + seccion.slice(1));
+    if (targetBtn) {
+      targetBtn.classList.add('bg-muni-700', 'text-white', 'font-semibold');
+      targetBtn.classList.remove('text-blue-100');
+    }
+
+    const titles = {
+      dashboard: ['Consolidado Institucional', 'Gestión de fomento productivo y padrón de emprendedores'],
+      fichas: ['Padrón Comunal de Emprendedores', 'Consulta de fichas registradas y expedientes digitales'],
+      nuevo: ['Registrar Ficha Nueva', 'Ingreso de personas naturales y unidades productivas'],
+      iniciativas: ['Ferias e Iniciativas Comunales', 'Convocatorias públicas, cupos y postulaciones en Turso'],
+      seleccion: ['Selección y Asignación de Emprendedores', 'Evaluación directa por funcionarios y gestión masiva en dos caminos'],
+      seguimiento: ['Seguimiento e Impacto Post-Mercado', 'Evaluación masiva en terreno: asistencia, ventas por día y seguidores'],
+      expediente: ['Expediente Digital Google Drive', 'Subida organizada de documentación y certificados'],
+      turso: ['Base de Datos Turso (libSQL)', 'Pipeline API v2 y sincronización de esquema']
+    };
+
+    if (titles[seccion]) {
+      const topTitle = document.getElementById('topTitle');
+      const topSubtitle = document.getElementById('topSubtitle');
+      if (topTitle) topTitle.textContent = titles[seccion][0];
+      if (topSubtitle) topSubtitle.textContent = titles[seccion][1];
+    }
+
+    if (seccion === 'fichas') {
+      cargarListaFichas();
+    } else if (seccion === 'dashboard') {
+      actualizarDashboardCompleto();
+    } else if (seccion === 'iniciativas') {
+      cargarIniciativas();
+    } else if (seccion === 'seleccion') {
+      inicializarVistaSeleccion();
+    } else if (seccion === 'seguimiento') {
+      inicializarVistaSeguimientoMasivo();
+    }
+  };
+
+  // Validación de RUT en vivo
+  window.validarRutInput = async function(input) {
+    const feedback = document.getElementById('rutFeedback');
+    if (!input || !input.value.trim()) {
+      if (feedback) feedback.innerHTML = '';
+      return;
+    }
+
+    try {
+      const res = await call('apiValidarRut', input.value);
+      if (res && res.success && res.data) {
+        input.value = res.data.rutFormateado;
+        if (feedback) {
+          feedback.innerHTML = '<span class="text-emerald-600 font-semibold">✓ RUT Válido (' + res.data.rutFormateado + ')</span>';
+        }
+      } else {
+        if (feedback) {
+          feedback.innerHTML = '<span class="text-rose-600 font-semibold">✕ ' + (res?.error || 'RUT inválido') + '</span>';
+        }
+      }
+    } catch (e) {
+      if (feedback) feedback.innerHTML = '<span class="text-slate-400">' + e.message + '</span>';
+    }
+  };
+
+  // Cargar lista de Fichas
+  window.cargarListaFichas = async function() {
+    const tbody = document.getElementById('tablaFichasBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">Consultando base de datos...</td></tr>';
+    const termino = document.getElementById('filtroTermino')?.value || '';
+    const rubro = document.getElementById('filtroRubro')?.value || '';
+
+    try {
+      const res = await call('apiFichasListar', { termino: termino, rubro: rubro, limite: 50 });
+      const lista = (res && res.success ? res.data : (res && res.data ? res.data : [])) || [];
+
+      if (!lista || lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No se encontraron emprendedores registrados.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = lista.map(item => {
+        const rut = item.rut_formateado || item.RUT || item.rut || '—';
+        const nombres = `${item.nombres || item.NOMBRES || ''} ${item.apellidos || item.APELLIDOS || ''}`.trim() || 'Sin Nombre';
+        const negocio = item.nombre_comercial || item.NOMBRE_COMERCIAL || item.nombreComercial || 'Emprendimiento';
+        const rubroText = item.rubro || item.RUBRO || item.ID_RUBRO || 'OTRO';
+        const contacto = item.telefono || item.TELEFONO || item.email || item.EMAIL || '—';
+        const s = item.formalizacion_sii || item.FORMALIZACION_SII || 'SIN_INICIO';
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="px-6 py-3.5">
+              <div class="font-bold text-slate-800">${escapeHtml(nombres)}</div>
+              <div class="text-xs font-mono text-muni-600 font-semibold">${escapeHtml(rut)}</div>
+            </td>
+            <td class="px-6 py-3.5">
+              <div class="font-semibold text-slate-700">${escapeHtml(negocio)}</div>
+              <div class="text-xs text-slate-400">${escapeHtml(rubroText)}</div>
+            </td>
+            <td class="px-6 py-3.5 text-xs text-slate-600">
+              ${escapeHtml(contacto)}
+            </td>
+            <td class="px-6 py-3.5">
+              <span class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s === 'SIN_INICIO' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
+                ${escapeHtml(s.replace(/_/g, ' '))}
+              </span>
+            </td>
+            <td class="px-6 py-3.5 text-right">
+              <div class="flex items-center justify-end gap-1.5">
+                <button onclick="verFichaDetalle('${escapeHtml(item.rut || item.RUT || item.id_persona || '')}')" 
+                        class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition">
+                  Ver Ficha
+                </button>
+                <button onclick="iniciarEdicionFicha('${escapeHtml(item.rut || item.RUT || item.id_persona || '')}')" 
+                        class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg border border-amber-200 transition flex items-center gap-1 shadow-2xs"
+                        title="Editar datos del emprendedor o subsanar errores">
+                  <span>✏️</span> Editar
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-rose-500">Error: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  };
+
+  // Variable en memoria para la ficha abierta en modal
+  window._fichaActualDetalle = null;
+
+  // Ver Ficha Detalle (Modal)
+  window.verFichaDetalle = async function(rutOId) {
+    if (!rutOId) return;
+    const modal = document.getElementById('modalFicha');
+    const contenido = document.getElementById('modalContenido');
+    const nomTitular = document.getElementById('modalNombreTitular');
+    const rutTitular = document.getElementById('modalRutTitular');
+
+    if (nomTitular) nomTitular.textContent = 'Cargando expediente...';
+    if (rutTitular) rutTitular.textContent = '';
+    if (contenido) contenido.innerHTML = '<div class="py-8 text-center text-slate-400">Consultando datos relacionales y Drive...</div>';
+    if (modal) modal.classList.remove('hidden');
+
+    try {
+      const res = await call('apiFichaDetalle', rutOId);
+      if (!res || !res.success || !res.data) {
+        if (contenido) contenido.innerHTML = `<div class="p-4 bg-rose-50 text-rose-700 rounded-lg">${escapeHtml(res?.error || 'No fue posible cargar el detalle')}</div>`;
+        return;
+      }
+
+      window._fichaActualDetalle = res.data;
+      const p = res.data.persona || {};
+      const emps = res.data.emprendimientos || [];
+      const docs = res.data.documentos || [];
+
+      if (nomTitular) nomTitular.textContent = `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'Ficha de Emprendedor';
+      if (rutTitular) rutTitular.textContent = p.rut_formateado || p.rut || '';
+
+      let html = `
+        <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div><strong class="text-slate-500">Teléfono:</strong> ${escapeHtml(p.telefono || 'No registra')}</div>
+          <div><strong class="text-slate-500">Email:</strong> ${escapeHtml(p.email || 'No registra')}</div>
+          <div><strong class="text-slate-500">Comuna:</strong> ${escapeHtml(p.comuna || 'SANTIAGO')}</div>
+          <div><strong class="text-slate-500">RSH:</strong> ${escapeHtml((p.tramo_rsh || 'SIN_RSH').replace(/_/g, ' '))}</div>
+        </div>
+
+        <div class="border-t border-slate-100 pt-2">
+          <div class="font-bold text-slate-700 text-xs uppercase mb-2">Unidad Productiva</div>
+          ${emps.length > 0 ? emps.map(e => `
+            <div class="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-1 mb-2">
+              <div class="font-bold text-blue-900">${escapeHtml(e.nombre_comercial)}</div>
+              <div class="text-slate-500">Rubro: ${escapeHtml(e.rubro)} | SII: ${escapeHtml((e.formalizacion_sii || 'SIN_INICIO').replace(/_/g, ' '))}</div>
+              ${e.instagram ? `<div class="text-blue-600 font-medium">IG: ${escapeHtml(e.instagram)}</div>` : ''}
+            </div>
+          `).join('') : '<div class="text-slate-400">Sin unidades productivas registradas.</div>'}
+        </div>
+
+        <div class="border-t border-slate-100 pt-2">
+          <div class="font-bold text-slate-700 text-xs uppercase mb-2">Expediente Documental en Google Drive</div>
+          ${docs.length > 0 ? `
+            <div class="space-y-1.5">
+              ${docs.map(d => `
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                  <div>
+                    <div class="font-semibold text-slate-800">${escapeHtml(d.tipo_documento.replace(/_/g, ' '))}</div>
+                    <div class="text-[11px] text-slate-400">${escapeHtml(d.nombre_archivo || 'Archivo Drive')}</div>
+                  </div>
+                  <a href="${escapeHtml(d.drive_url || '#')}" target="_blank" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold">
+                    Ver en Drive ↗
+                  </a>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div class="text-slate-400">No hay documentos digitalizados para este emprendedor.</div>'}
+        </div>
+      `;
+
+      if (contenido) contenido.innerHTML = html;
+    } catch (err) {
+      if (contenido) contenido.innerHTML = `<div class="p-4 bg-rose-50 text-rose-700 rounded-lg">Error: ${escapeHtml(err.message)}</div>`;
+    }
+  };
+
+  window.cerrarModalFicha = function() {
+    const modal = document.getElementById('modalFicha');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  // Iniciar edición desde el botón del modal de ficha
+  window.iniciarEdicionDesdeModal = function() {
+    cerrarModalFicha();
+    if (window._fichaActualDetalle && window._fichaActualDetalle.persona) {
+      const rut = window._fichaActualDetalle.persona.rut || window._fichaActualDetalle.persona.id_persona;
+      iniciarEdicionFicha(rut);
+    }
+  };
+
+  // Iniciar edición completa de un emprendedor
+  window.iniciarEdicionFicha = async function(rutOId) {
+    if (!rutOId) return;
+    mostrarToast('Cargando expediente para edición...', 'info');
+
+    try {
+      const res = await call('apiFichaDetalle', rutOId);
+      if (!res || !res.success || !res.data) {
+        mostrarToast(res?.error || 'No fue posible cargar los datos del emprendedor.', 'error');
+        return;
+      }
+
+      const p = res.data.persona || {};
+      const emps = res.data.emprendimientos || [];
+      const emp = emps[0] || {};
+
+      // Cargar IDs de control de edición
+      const editIdPer = document.getElementById('editIdPersona');
+      const editIdEmp = document.getElementById('editIdEmprendimiento');
+      const editRutOrig = document.getElementById('editRutOriginal');
+      if (editIdPer) editIdPer.value = p.id_persona || '';
+      if (editIdEmp) editIdEmp.value = emp.id_emprendimiento || '';
+      if (editRutOrig) editRutOrig.value = p.rut || '';
+
+      // Precargar campos de Persona
+      const inRut = document.getElementById('inputRut');
+      const inNombres = document.getElementById('inputNombres');
+      const inApellidos = document.getElementById('inputApellidos');
+      const inTel = document.getElementById('inputTelefono');
+      const inEmail = document.getElementById('inputEmail');
+      const inComuna = document.getElementById('inputComuna');
+      const inTramoRsh = document.getElementById('inputTramoRsh');
+
+      if (inRut) inRut.value = p.rut_formateado || p.rut || '';
+      if (inNombres) inNombres.value = p.nombres || '';
+      if (inApellidos) inApellidos.value = p.apellidos || '';
+      if (inTel) inTel.value = p.telefono || '';
+      if (inEmail) inEmail.value = p.email || '';
+      if (inComuna) inComuna.value = p.comuna || 'SANTIAGO';
+      if (inTramoRsh && p.tramo_rsh) inTramoRsh.value = p.tramo_rsh;
+
+      // Precargar campos de Emprendimiento
+      const inNomCom = document.getElementById('inputNombreComercial');
+      const inRubro = document.getElementById('inputRubro');
+      const inSubrubro = document.getElementById('inputSubrubro');
+      const inEsp = document.getElementById('inputEspecialidad');
+      const inFormal = document.getElementById('inputFormalizacion');
+      const inIg = document.getElementById('inputInstagram');
+      const inDesc = document.getElementById('inputDescripcion');
+
+      if (inNomCom) inNomCom.value = emp.nombre_comercial || emp.nombre_fantasia || '';
+      if (inRubro && emp.rubro) {
+        inRubro.value = emp.rubro;
+        actualizarSubrubrosFormulario();
+      }
+      if (inSubrubro && emp.subrubro) inSubrubro.value = emp.subrubro;
+      if (inEsp) inEsp.value = emp.descripcion_producto || '';
+      if (inFormal && emp.formalizacion_sii) inFormal.value = emp.formalizacion_sii;
+      if (inIg) inIg.value = emp.instagram || '';
+      if (inDesc) inDesc.value = emp.descripcion_producto || '';
+
+      // Activar banner visual de Modo Edición
+      const banner = document.getElementById('bannerModoEdicion');
+      const bannerTxt = document.getElementById('bannerModoEdicionTexto');
+      const btnCancel = document.getElementById('btnCancelarEdicionPie');
+      const btnTxt = document.getElementById('btnGuardarFichaTexto');
+      const tituloForm = document.getElementById('tituloFormFicha');
+      const subForm = document.getElementById('subtituloFormFicha');
+
+      if (banner) banner.classList.remove('hidden');
+      if (bannerTxt) bannerTxt.textContent = `Actualizando datos de: ${emp.nombre_comercial || p.nombres} (RUT: ${p.rut_formateado || p.rut}). Puede corregir cualquier campo.`;
+      if (btnCancel) btnCancel.classList.remove('hidden');
+      if (btnTxt) btnTxt.textContent = 'Guardar Cambios Actualizados';
+      if (tituloForm) tituloForm.textContent = 'Editar y Actualizar Ficha de Emprendedor';
+      if (subForm) subForm.textContent = 'Corrija errores de digitación o actualice información personal y de la unidad productiva.';
+
+      // Navegar a la sección del formulario
+      cambiarSeccion('nuevo');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      mostrarToast('Formulario cargado en Modo Edición.', 'success');
+    } catch (err) {
+      mostrarToast('Error al cargar datos: ' + err.message, 'error');
+    }
+  };
+
+  // Cancelar la edición y volver a modo nuevo registro
+  window.cancelarEdicionFicha = function() {
+    const editIdPer = document.getElementById('editIdPersona');
+    const editIdEmp = document.getElementById('editIdEmprendimiento');
+    const editRutOrig = document.getElementById('editRutOriginal');
+    if (editIdPer) editIdPer.value = '';
+    if (editIdEmp) editIdEmp.value = '';
+    if (editRutOrig) editRutOrig.value = '';
+
+    document.getElementById('formFicha')?.reset();
+    document.getElementById('rutFeedback').innerHTML = '';
+
+    const banner = document.getElementById('bannerModoEdicion');
+    const btnCancel = document.getElementById('btnCancelarEdicionPie');
+    const btnTxt = document.getElementById('btnGuardarFichaTexto');
+    const tituloForm = document.getElementById('tituloFormFicha');
+    const subForm = document.getElementById('subtituloFormFicha');
+
+    if (banner) banner.classList.add('hidden');
+    if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnTxt) btnTxt.textContent = 'Guardar en Turso';
+    if (tituloForm) tituloForm.textContent = 'Formulario de Ficha Integral';
+    if (subForm) subForm.textContent = 'Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en Turso.';
+
+    cambiarSeccion('fichas');
+  };
+
+  // Guardar Formulario Nueva Ficha o Edición
+  window.guardarFormularioFicha = async function(e) {
+    if (e) e.preventDefault();
+    const btn = document.getElementById('btnGuardarFicha');
+    if (btn) btn.disabled = true;
+
+    const idPersonaEdit = document.getElementById('editIdPersona')?.value || null;
+    const idEmpEdit = document.getElementById('editIdEmprendimiento')?.value || null;
+    const rutOrigEdit = document.getElementById('editRutOriginal')?.value || null;
+    const esModoEdicion = Boolean(idPersonaEdit || idEmpEdit);
+
+    const payload = {
+      idPersona: idPersonaEdit,
+      idEmprendimiento: idEmpEdit,
+      rutOriginal: rutOrigEdit,
+      rut: document.getElementById('inputRut')?.value,
+      nombres: document.getElementById('inputNombres')?.value,
+      apellidos: document.getElementById('inputApellidos')?.value,
+      telefono: document.getElementById('inputTelefono')?.value,
+      email: document.getElementById('inputEmail')?.value,
+      comuna: document.getElementById('inputComuna')?.value,
+      nombreComercial: document.getElementById('inputNombreComercial')?.value,
+      rubro: document.getElementById('inputRubro')?.value,
+      subrubro: document.getElementById('inputSubrubro')?.value,
+      especialidad: document.getElementById('inputEspecialidad')?.value,
+      formalizacionSii: document.getElementById('inputFormalizacion')?.value,
+      tramoRsh: document.getElementById('inputTramoRsh')?.value,
+      instagram: document.getElementById('inputInstagram')?.value,
+      descripcion: document.getElementById('inputDescripcion')?.value
+    };
+
+    try {
+      const res = await call('apiFichaGuardar', payload);
+      if (res && res.success) {
+        mostrarToast(res.data?.mensaje || (esModoEdicion ? 'Datos actualizados con éxito en Turso.' : 'Ficha guardada con éxito en Turso.'), 'success');
+        
+        // Resetear modo edición
+        cancelarEdicionFicha();
+        cargarListaFichas();
+      } else {
+        mostrarToast(res?.error || 'No fue posible guardar la ficha.', 'error');
+      }
+    } catch (err) {
+      mostrarToast('Error: ' + err.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // Subir Documento a Drive y Turso
+  window.cargarDocumentoDrive = async function(e) {
+    if (e) e.preventDefault();
+    const rut = document.getElementById('docRut')?.value;
+    const tipo = document.getElementById('docTipo')?.value;
+    const fileInput = document.getElementById('docFile');
+    const file = fileInput?.files?.[0];
+
+    if (!rut || !tipo || !file) {
+      mostrarToast('Complete el RUT, tipo de documento y seleccione un archivo.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btnSubirDoc');
+    if (btn) btn.disabled = true;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async function(event) {
+        const base64Data = event.target.result.split(',')[1];
+        try {
+          const res = await call('apiExpedienteCargar', {
+            rut: rut,
+            tipoDocumento: tipo,
+            archivo: {
+              name: file.name,
+              mimeType: file.type,
+              base64: base64Data
+            }
+          });
+
+          if (res && res.success) {
+            mostrarToast('Documento guardado en Drive y registrado en Turso.', 'success');
+            document.getElementById('formCargaDoc')?.reset();
+            cambiarSeccion('fichas');
+          } else {
+            mostrarToast(res?.error || 'Error al guardar documento.', 'error');
+          }
+        } catch (err) {
+          mostrarToast('Error al cargar documento: ' + err.message, 'error');
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      mostrarToast('Error leyendo archivo: ' + err.message, 'error');
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // Métodos Turso (libSQL Pipeline API v2)
+  window.probarConexionTurso = async function() {
+    const log = document.getElementById('tursoStatusLog');
+    if (log) log.textContent = 'Probando conexión con Turso mediante HTTP Pipeline v2 (SELECT 1)...';
+    try {
+      const res = await call('apiTursoProbar');
+      if (res && res.success) {
+        if (log) log.textContent = `✓ CONEXIÓN EXITOSA CON TURSO\n- Fecha servidor Turso: ${res.data?.detalle?.fecha_servidor || 'OK'}\n- Mensaje: ${res.data?.mensaje || 'Conectado'}`;
+        mostrarToast('Conexión con Turso exitosa.', 'success');
+      } else {
+        if (log) log.textContent = `✕ FALLO DE CONEXIÓN:\n${res?.error || 'No se pudo conectar'}\n\nVerifica tu TURSO_DATABASE_URL y TURSO_AUTH_TOKEN.`;
+        mostrarToast('Error al conectar con Turso.', 'error');
+      }
+    } catch (err) {
+      if (log) log.textContent = `✕ ERROR: ${err.message}`;
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  window.guardarTursoConfig = async function(e) {
+    if (e) e.preventDefault();
+    const url = document.getElementById('cfgTursoUrl')?.value;
+    const token = document.getElementById('cfgTursoToken')?.value;
+    if (!url || !token) {
+      mostrarToast('Ingrese URL y Token de Turso.', 'error');
+      return;
+    }
+    const log = document.getElementById('tursoStatusLog');
+    if (log) log.textContent = 'Guardando credenciales de Turso en Propiedades del Script...';
+    try {
+      const res = await call('apiTursoConfigurar', url, token);
+      if (res && res.success) {
+        if (log) log.textContent = '✓ Credenciales guardadas y verificadas correctamente en Turso.';
+        mostrarToast('Credenciales guardadas y verificadas.', 'success');
+      } else {
+        if (log) log.textContent = `✕ Error al verificar credenciales:\n${res?.error || 'Error desconocido'}`;
+        mostrarToast(res?.error || 'Error al verificar credenciales', 'error');
+      }
+    } catch (err) {
+      if (log) log.textContent = `✕ ERROR: ${err.message}`;
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  window.inicializarTablasTurso = async function() {
+    const log = document.getElementById('tursoStatusLog');
+    if (log) log.textContent = 'Ejecutando sentencias DDL (CREATE TABLE IF NOT EXISTS) en Turso...';
+    try {
+      const res = await call('apiTursoInicializar');
+      if (res && res.success) {
+        if (log) log.textContent = `✓ TABLAS INICIALIZADAS EXITOSAMENTE\n- Tablas e Índices creados: ${res.data?.tablasCreadas || 7}\n- Mensaje: ${res.data?.mensaje || 'Listo'}`;
+        mostrarToast('Tablas e índices creados en Turso.', 'success');
+      } else {
+        if (log) log.textContent = `✕ Error inicializando DDL:\n${res?.error || 'Error de ejecución'}`;
+        mostrarToast(res?.error || 'Error creando tablas en Turso', 'error');
+      }
+    } catch (err) {
+      if (log) log.textContent = `✕ ERROR: ${err.message}`;
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // ===== CATÁLOGO DE RUBROS Y SUBRUBROS ULTRA DIVERSIFICADOS =====
+  window.CATALOGO_SUBRUBROS = {
+    ARTESANIA: [
+      'Cerámica gres, alfarería y arcilla tradicional',
+      'Tallado en madera, juguetes didácticos y ebanistería',
+      'Talabartería y artículos en cuero legítimo',
+      'Orfebrería en cobre, bronce y metales nobles',
+      'Joyería contemporánea, plata 925 y pedrería',
+      'Vidrio fundido, mosaico y vitrofusión',
+      'Fieltro, vellón, telar mapuche y lana natural',
+      'Cestería tradicional en fibras vegetales',
+      'Escultura, modelado y artesanía decorativa',
+      'Otra artesanía tradicional u oficio patrimonial'
+    ],
+    ALIMENTACION: [
+      'Panadería artesanal y masas de masa madre',
+      'Pastelería fina, repostería y tortas de autor',
+      'Cafetería de especialidad, té en hebras e infusiones',
+      'Chocolatería artesanal y confitería gourmet',
+      'Conservas dulces, mermeladas y mieles puras',
+      'Encurtidos, salsas, ajíes y aderezos gourmet',
+      'Cervecería artesanal, hidromiel y licores macerados',
+      'Comida al paso (food trucks, empanadas, sánguches)',
+      'Alimentación consciente (vegana, vegetariana, sin gluten)',
+      'Frutos secos, semillas y deshidratados'
+    ],
+    TEXTIL: [
+      'Vestuario de autor y moda ética sustentable',
+      'Confección infantil, bebés y maternidad',
+      'Ropa deportiva y prendas técnicas',
+      'Calzado artesanal y marroquinería en cuero',
+      'Bolsos, mochilas y accesorios textiles urbanos',
+      'Tejidos a palillo, crochet y macramé',
+      'Accesorios de moda, pañuelos de seda y corbatas',
+      'Serigrafía textil y estampación artística',
+      'Upcycling y supra-reciclaje textil de autor'
+    ],
+    COSMETICA: [
+      'Fitoterapia, extractos y cosmética botánica',
+      'Jabonería vegetal saponificada en frío',
+      'Aromaterapia, brumas, aceites esenciales y difusores',
+      'Velas vegetales de soya y cera de abeja',
+      'Cuidado capilar natural y productos de barbería',
+      'Maquillaje ecológico y pigmentos naturales',
+      'Salud, higiene femenina y bienestar corporal'
+    ],
+    ORFEBRERIA: [
+      'Joyería fina en plata 950 y piedras semipreciosas',
+      'Orfebrería patrimonial en cobre esmaltado',
+      'Bisutería de autor con materiales reciclados',
+      'Argollas y piezas personalizadas por encargo'
+    ],
+    CREATIVAS: [
+      'Ilustración tradicional, acuarela y grabado',
+      'Papelería botánica, libretas y encuadernación artesanal',
+      'Editorial independiente, fanzines y libros ilustrados',
+      'Juegos de mesa criollos y diseño lúdico',
+      'Fotografía artística, afiches y prints de colección',
+      'Stickers, pins y merchandising autoral'
+    ],
+    HOGAR: [
+      'Plantas de interior, suculentas y terrarios',
+      'Huertos urbanos, almácigos y semillas agroecológicas',
+      'Macetas en gres, terrazo, cerámica y cemento blanco',
+      'Textiles del hogar (mantas, caminos de mesa, cojines)',
+      'Lámparas de diseño, iluminación cálida y vitrales'
+    ],
+    SUSTENTABILIDAD: [
+      'Valorización de descartes y reciclaje creativo',
+      'Ecodiseño y sustitutos de plásticos de un solo uso',
+      'Lombricultura y compostaje domiciliario',
+      'Restauración de muebles patrimoniales y maderas nobles'
+    ],
+    TECNOLOGIA: [
+      'Desarrollo web y soluciones digitales para pymes',
+      'Producción audiovisual, fotografía de producto y redes',
+      'Consultoría en diseño, branding e identidad visual',
+      'Servicios técnicos y reparación electrónica'
+    ],
+    COMERCIO: [
+      'Regalería con identidad comunal y recuerdos de Santiago',
+      'Librería de barrio y libros de viejo seleccionados',
+      'Almacén natural y despensa a granel',
+      'Juguetería tradicional y coleccionables'
+    ],
+    OTRO: [
+      'Servicios creativos o comunitarios',
+      'Innovación productiva emergente',
+      'Oficio tradicional no clasificado'
+    ]
+  };
+
+  window.actualizarSubrubrosFormulario = function(rubro) {
+    const sel = document.getElementById('inputSubrubro');
+    if (!sel) return;
+    sel.innerHTML = '';
+    const lista = window.CATALOGO_SUBRUBROS[rubro] || ['General / Sin subrubro específico'];
+    lista.forEach(sub => {
+      const opt = document.createElement('option');
+      opt.value = sub;
+      opt.textContent = sub;
+      sel.appendChild(opt);
+    });
+  };
+
+  // Instancias Globales de Chart.js
+  let chartInstRubros = null;
+  let chartInstFormalizacion = null;
+  let chartInstComunas = null;
+  let chartInstEdades = null;
+  let chartInstVentas = null;
+  let chartInstSeguidores = null;
+  let datosMercadoActual = null;
+
+  // ===== DASHBOARD CONSOLIDADO CON 6 GRÁFICOS Y 4 CUADROS SUPERIORES =====
+  window.actualizarDashboardCompleto = async function() {
+    try {
+      const res = await call('apiDashboardConsolidado');
+      if (!res || !res.success || !res.data) {
+        console.warn('No se pudieron obtener datos del dashboard consolidado');
+        return;
+      }
+
+      const d = res.data;
+      const c = d.cuadrosSuperiores || {};
+      const k = d.kpis || {};
+      const g = d.graficos || {};
+
+      // 1. Actualizar los 4 Cuadros Superiores Idénticos a la Imagen
+      const elDocComp = document.getElementById('cuadroDocCompleta');
+      const elDocObs = document.getElementById('cuadroDocObservada');
+      const elCasos = document.getElementById('cuadroCasosCompletar');
+      const elDup = document.getElementById('cuadroDuplicados');
+
+      if (elDocComp) elDocComp.textContent = c.documentacionBaseCompleta ?? 0;
+      if (elDocObs) elDocObs.textContent = c.documentosObservados ?? 0;
+      if (elCasos) elCasos.textContent = c.casosPorCompletar ?? 0;
+      if (elDup) elDup.textContent = c.duplicadosPendientes ?? 0;
+
+      // 2. Actualizar Barra de Métricas Globales
+      const elP = document.getElementById('kpiPersonas');
+      const elE = document.getElementById('kpiEmprendimientos');
+      const elI = document.getElementById('kpiIniciativas');
+      const elV = document.getElementById('kpiVentas');
+
+      if (elP) elP.textContent = k.personas || 0;
+      if (elE) elE.textContent = k.emprendimientos || 0;
+      if (elI) elI.textContent = k.iniciativasActivas || 0;
+      if (elV) elV.textContent = '$' + Number(k.ventasHistoricas || 0).toLocaleString('es-CL');
+
+      // 3. Renderizar los 6 Gráficos con Chart.js
+      renderizar6Graficos(g);
+
+      // 4. Cargar el Selector del Dashboard especializado por mercado
+      cargarSelectorIniciativasDashboard(d.iniciativasRecientes || []);
+
+    } catch (err) {
+      console.error('Error al actualizar Dashboard Completo:', err);
+    }
+  };
+
+  // Renderizador de los 6 gráficos
+  function renderizar6Graficos(g) {
+    if (typeof Chart === 'undefined') {
+      console.warn('Chart.js aún no está cargado');
+      return;
+    }
+
+    const defaultFont = { family: "'Plus Jakarta Sans', sans-serif", size: 11 };
+
+    // --- 1. Rubros Principales (Bar Chart) ---
+    const ctxRubros = document.getElementById('chartRubros');
+    if (ctxRubros) {
+      if (chartInstRubros) chartInstRubros.destroy();
+      const rubrosData = g.rubros || [];
+      const labels = rubrosData.map(r => r.rubro || 'ARTESANIA');
+      const values = rubrosData.map(r => Number(r.cantidad || 0));
+
+      chartInstRubros = new Chart(ctxRubros, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['ARTESANIA'],
+          datasets: [{
+            data: values.length ? values : [1],
+            backgroundColor: '#3b82f6',
+            borderRadius: 6,
+            maxBarThickness: 36
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: defaultFont } },
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: defaultFont }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+    }
+
+    // --- 2. Nivel de Formalización (Bar Chart Teal) ---
+    const ctxForm = document.getElementById('chartFormalizacion');
+    if (ctxForm) {
+      if (chartInstFormalizacion) chartInstFormalizacion.destroy();
+      const formData = g.formalizacion || [];
+      const labels = formData.map(f => f.etiqueta || 'Sin inicio de actividades');
+      const values = formData.map(f => Number(f.cantidad || 0));
+
+      chartInstFormalizacion = new Chart(ctxForm, {
+        type: 'bar',
+        data: {
+          labels: labels.length ? labels : ['Sin inicio de actividades', 'Primera categoría'],
+          datasets: [{
+            data: values.length ? values : [0, 1],
+            backgroundColor: '#0d9488',
+            borderRadius: 6,
+            maxBarThickness: 36
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: defaultFont, maxRotation: 20 } },
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: defaultFont }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+    }
+
+    // --- 3. Comunas de Residencia (Doughnut Chart) ---
+    const ctxComunas = document.getElementById('chartComunas');
+    if (ctxComunas) {
+      if (chartInstComunas) chartInstComunas.destroy();
+      const comData = g.comunas || [];
+      const labels = comData.map(c => c.comuna || 'Santiago');
+      const values = comData.map(c => Number(c.cantidad || 0));
+
+      chartInstComunas = new Chart(ctxComunas, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length ? labels : ['Santiago'],
+          datasets: [{
+            data: values.length ? values : [1],
+            backgroundColor: ['#005a9c', '#0284c7', '#0d9488', '#c59b27', '#6366f1', '#f59e0b'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 12, font: defaultFont } }
+          },
+          cutout: '65%'
+        }
+      });
+    }
+
+    // --- 4. Distribución por Edades (Bar Chart Naranja) ---
+    const ctxEdades = document.getElementById('chartEdades');
+    if (ctxEdades) {
+      if (chartInstEdades) chartInstEdades.destroy();
+      const rangosOrdenados = ['18-29', '30-44', '45-59', '60+', 'Sin información'];
+      const mapaEdades = {};
+      (g.edades || []).forEach(e => { mapaEdades[e.rango_edad] = Number(e.cantidad || 0); });
+
+      const values = rangosOrdenados.map(r => mapaEdades[r] || 0);
+
+      chartInstEdades = new Chart(ctxEdades, {
+        type: 'bar',
+        data: {
+          labels: rangosOrdenados,
+          datasets: [{
+            data: values,
+            backgroundColor: '#ea580c',
+            borderRadius: 6,
+            maxBarThickness: 32
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: defaultFont } },
+            y: { beginAtZero: true, ticks: { stepSize: 1, font: defaultFont }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+    }
+
+    // --- 5. Evolución de Ventas ($) (Line Chart Verde) ---
+    const ctxVentas = document.getElementById('chartVentas');
+    if (ctxVentas) {
+      if (chartInstVentas) chartInstVentas.destroy();
+      const vData = g.evolucionVentas || [
+        { hito: 'Antes', monto: 200000 },
+        { hito: 'Durante', monto: 450000 },
+        { hito: 'Después', monto: 350000 }
+      ];
+
+      chartInstVentas = new Chart(ctxVentas, {
+        type: 'line',
+        data: {
+          labels: vData.map(v => v.hito),
+          datasets: [{
+            data: vData.map(v => Number(v.monto || 0)),
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#059669',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(item) {
+                  return '$' + Number(item.raw).toLocaleString('es-CL');
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: defaultFont } },
+            y: {
+              ticks: {
+                callback: function(val) { return '$' + Number(val).toLocaleString('es-CL'); },
+                font: defaultFont
+              },
+              grid: { color: '#f1f5f9' }
+            }
+          }
+        }
+      });
+    }
+
+    // --- 6. Evolución Seguidores Instagram (Line Chart Violeta) ---
+    const ctxSeg = document.getElementById('chartSeguidores');
+    if (ctxSeg) {
+      if (chartInstSeguidores) chartInstSeguidores.destroy();
+      const sData = g.evolucionSeguidores || [
+        { hito: 'Antes', cantidad: 120 },
+        { hito: 'Después', cantidad: 240 }
+      ];
+
+      chartInstSeguidores = new Chart(ctxSeg, {
+        type: 'line',
+        data: {
+          labels: sData.map(s => s.hito),
+          datasets: [{
+            data: sData.map(s => Number(s.cantidad || 0)),
+            borderColor: '#7c3aed',
+            backgroundColor: 'rgba(124, 58, 237, 0.1)',
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#7c3aed',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: defaultFont } },
+            y: { beginAtZero: true, ticks: { font: defaultFont }, grid: { color: '#f1f5f9' } }
+          }
+        }
+      });
+    }
+  }
+
+  // ===== DASHBOARD ESPECIALIZADO POR MERCADO Y 7 CARPETAS OPERATIVAS =====
+  async function cargarSelectorIniciativasDashboard(iniciativas) {
+    const sel = document.getElementById('selectorMercadoDashboard');
+    if (!sel) return;
+
+    let lista = iniciativas;
+    if (!lista || lista.length === 0) {
+      try {
+        const res = await call('apiIniciativasListar');
+        lista = (res && res.success && res.data) ? res.data : [];
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    if (!lista || lista.length === 0) {
+      sel.innerHTML = '<option value="">No hay iniciativas creadas</option>';
+      return;
+    }
+
+    sel.innerHTML = lista.map(ini => `
+      <option value="${ini.id_iniciativa}">${ini.nombre} (${ini.codigo || ''})</option>
+    `).join('');
+
+    // Cargar automáticamente el detalle de la primera iniciativa seleccionada
+    if (sel.value) {
+      cambiarMercadoDashboard(sel.value);
+    }
+  }
+
+  window.cambiarMercadoDashboard = async function(idIniciativa) {
+    if (!idIniciativa) return;
+    const grid = document.getElementById('gridCarpetasMercado');
+    if (grid) grid.innerHTML = '<div class="col-span-full py-4 text-center text-slate-400 text-xs">Cargando carpetas de Apps Script...</div>';
+
+    try {
+      const res = await call('apiDetalleMercadoIntegral', idIniciativa);
+      if (!res || !res.success || !res.data) {
+        if (grid) grid.innerHTML = '<div class="col-span-full py-4 text-center text-red-500 text-xs">No fue posible obtener los datos de la iniciativa.</div>';
+        return;
+      }
+
+      datosMercadoActual = res.data;
+      const m = res.data.metricas || {};
+      const ini = res.data.iniciativa || {};
+      const carpetas = res.data.carpetas || [];
+
+      // Actualizar tarjetas de métricas del mercado
+      const elP = document.getElementById('mercadoTotalPost');
+      const elT = document.getElementById('mercadoTitulares');
+      const elS = document.getElementById('mercadoSuplentes');
+      const elC = document.getElementById('mercadoCupos');
+      const elV = document.getElementById('mercadoVentas');
+      const elA = document.getElementById('mercadoAsistencia');
+
+      if (elP) elP.textContent = m.totalPostulantes || 0;
+      if (elT) elT.textContent = m.titularesConfirmados || 0;
+      if (elS) elS.textContent = m.suplentes || 0;
+      if (elC) elC.textContent = (ini.cupos_titulares || 0) + ' / ' + (ini.cupos_suplentes || 0);
+      if (elV) elV.textContent = '$' + Number(m.ventasReportadas || 0).toLocaleString('es-CL');
+      if (elA) elA.textContent = m.asistenciaTotal || 0;
+
+      // Renderizar las 7 Carpetas Operativas de Apps Script
+      if (grid) {
+        grid.innerHTML = carpetas.map(c => `
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md transition flex flex-col justify-between group">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <span class="text-xl">${c.icono || '📁'}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  ${c.archivosCount} doc${c.archivosCount === 1 ? '' : 's'}
+                </span>
+              </div>
+              <h4 class="font-bold text-slate-800 text-xs tracking-tight group-hover:text-muni-700 transition">${c.nombre}</h4>
+              <p class="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">${c.descripcion}</p>
+            </div>
+            <div class="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between">
+              <button onclick="abrirModalCarpetaMercado('${c.id}')" class="text-xs font-semibold text-muni-600 hover:text-muni-800 flex items-center gap-1">
+                <span>Inspeccionar</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </button>
+              <a href="${c.driveUrl}" target="_blank" title="Abrir en Google Drive" class="text-slate-400 hover:text-muni-700 p-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              </a>
+            </div>
+          </div>
+        `).join('');
+      }
+
+    } catch (err) {
+      console.error('Error al cambiar mercado en dashboard:', err);
+    }
+  };
+
+  // Modales de Carpeta Operativa
+  window.abrirModalCarpetaMercado = function(carpetaId) {
+    if (!datosMercadoActual) return;
+    const carp = (datosMercadoActual.carpetas || []).find(c => c.id === carpetaId);
+    if (!carp) return;
+
+    const modal = document.getElementById('modalCarpetaMercado');
+    const icono = document.getElementById('modalCarpetaIcono');
+    const titulo = document.getElementById('modalCarpetaTitulo');
+    const desc = document.getElementById('modalCarpetaDesc');
+    const contenido = document.getElementById('modalCarpetaContenido');
+    const linkDrive = document.getElementById('btnLinkDriveCarpeta');
+
+    if (icono) icono.textContent = carp.icono;
+    if (titulo) titulo.textContent = carp.nombre;
+    if (desc) desc.textContent = carp.descripcion;
+    if (linkDrive) linkDrive.href = carp.driveUrl;
+
+    if (contenido) {
+      if (carp.id === 'SELECCIONADOS') {
+        const titulares = (datosMercadoActual.postulaciones || []).filter(p => p.estado_postulacion === 'CONFIRMADA' || p.estado_postulacion === 'TITULAR');
+        contenido.innerHTML = `
+          <div class="font-bold text-slate-800 text-xs mb-2">Emprendedores Titulares Seleccionados (${titulares.length}):</div>
+          <div class="divide-y divide-slate-100 max-h-56 overflow-y-auto bg-slate-50 p-2 rounded-lg border border-slate-200">
+            ${titulares.length ? titulares.map(t => `
+              <div class="py-1.5 flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-slate-800">${t.nombre_comercial || 'Sin nombre'}</div>
+                  <div class="text-[10px] text-slate-500">${t.nombres} ${t.apellidos} · ${t.rut_formateado}</div>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">CONFIRMADO</span>
+              </div>
+            `).join('') : '<div class="py-2 text-slate-400 text-center">No hay titulares confirmados aún.</div>'}
+          </div>
+        `;
+      } else if (carp.id === 'LISTADO_ASISTENTES') {
+        const posts = datosMercadoActual.postulaciones || [];
+        contenido.innerHTML = `
+          <div class="font-bold text-slate-800 text-xs mb-2">Nómina de Asistencia en Terreno (${posts.length}):</div>
+          <div class="divide-y divide-slate-100 max-h-56 overflow-y-auto bg-slate-50 p-2 rounded-lg border border-slate-200">
+            ${posts.length ? posts.map(p => `
+              <div class="py-1.5 flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-slate-800">${p.nombre_comercial || 'Emprendimiento'}</div>
+                  <div class="text-[10px] text-slate-500">${p.nombres} ${p.apellidos} · ${p.rut_formateado}</div>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-slate-200 text-slate-700">${p.estado_postulacion}</span>
+              </div>
+            `).join('') : '<div class="py-2 text-slate-400 text-center">Sin registros de postulaciones.</div>'}
+          </div>
+        `;
+      } else {
+        contenido.innerHTML = `
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+            <div class="text-2xl">${carp.icono}</div>
+            <div class="font-bold text-slate-800 text-xs">Directorio Oficial Drive: /${carp.nombre}</div>
+            <p class="text-[11px] text-slate-500">
+              Esta carpeta fue aprovisionada automáticamente siguiendo el estándar de Google Apps Script. 
+              Al subir archivos aquí, se vinculan al código de iniciativa <strong>${datosMercadoActual.iniciativa?.codigo || ''}</strong>.
+            </p>
+          </div>
+        `;
+      }
+    }
+
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.cerrarModalCarpetaMercado = function() {
+    const modal = document.getElementById('modalCarpetaMercado');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.subirArchivoACarpetaMercado = function() {
+    const fileInput = document.getElementById('inputArchivoCarpeta');
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      mostrarToast('Seleccione un archivo para cargar.', 'error');
+      return;
+    }
+    mostrarToast(`Archivo "${file.name}" cargado a la carpeta del mercado.`, 'success');
+    if (fileInput) fileInput.value = '';
+    cerrarModalCarpetaMercado();
+  };
+
+  // ===== GESTIÓN DE FERIAS E INICIATIVAS =====
+  window.cargarIniciativas = async function() {
+    const contenedor = document.getElementById('listaIniciativasCards');
+    if (!contenedor) return;
+    contenedor.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400">Cargando iniciativas de Turso...</div>';
+
+    try {
+      const res = await call('apiIniciativasListar', { estado: 'ABIERTA' });
+      const lista = (res && res.success && res.data) ? res.data : [];
+      window.listaIniciativasGlobal = lista;
+
+      if (lista.length === 0) {
+        contenedor.innerHTML = `
+          <div class="col-span-full bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-3">
+            <div class="text-3xl">🎪</div>
+            <h3 class="font-bold text-slate-700">No hay convocatorias abiertas</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">Crea una nueva feria comunal o capacitación para iniciar el proceso de postulación y selección de emprendedores.</p>
+            <button onclick="mostrarModalCrearIniciativa()" class="px-4 py-2 bg-muni-600 text-white text-xs font-bold rounded-lg shadow hover:bg-muni-700">
+              Crear Primera Convocatoria
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      contenedor.innerHTML = lista.map(ini => `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-slate-300 transition">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${ini.tipo === 'FERIA' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">
+                ${ini.tipo || 'FERIA'}
+              </span>
+              <span class="text-[10px] font-mono text-slate-400 font-medium">${ini.codigo || ''}</span>
+            </div>
+            <h3 class="font-bold text-slate-800 text-sm leading-snug">${escapeHtml(ini.nombre)}</h3>
+            ${ini.tematica ? `<div class="text-[11px] text-muni-700 font-semibold mt-1">🎨 ${escapeHtml(ini.tematica)}</div>` : ''}
+            <p class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              ${escapeHtml(ini.barrio ? ini.barrio + ' · ' + (ini.lugar || ini.ubicacion || '') : (ini.lugar || ini.ubicacion || 'Comuna de Santiago'))}
+            </p>
+            ${ini.objetivo ? `<p class="text-[11px] text-slate-500 mt-2 line-clamp-2 italic">${escapeHtml(ini.objetivo)}</p>` : ''}
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 space-y-3 text-xs">
+            <div class="grid grid-cols-2 gap-2 text-slate-600">
+              <div class="bg-slate-50 p-2 rounded-lg">
+                <div class="text-[10px] font-semibold text-slate-400 uppercase">Titulares</div>
+                <div class="text-sm font-bold text-slate-800">${ini.cupos_titulares || 20} cupos</div>
+              </div>
+              <div class="bg-slate-50 p-2 rounded-lg">
+                <div class="text-[10px] font-semibold text-slate-400 uppercase">Suplentes</div>
+                <div class="text-sm font-bold text-slate-800">${ini.cupos_suplentes || 10} cupos</div>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button onclick="abrirModalEditarIniciativa('${ini.id_iniciativa}')" class="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 transition flex items-center justify-center gap-1" title="Editar datos o fechas del mercado">
+                ✏️ Editar
+              </button>
+              <button onclick="abrirModalPostular('${ini.id_iniciativa}', '${ini.nombre.replace(/'/g, "\\'")}')" class="flex-1 py-2 px-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-lg border border-purple-200 transition">
+                + Inscribir
+              </button>
+              <button onclick="irASeleccionMercado('${ini.id_iniciativa}')" class="flex-1 py-2 px-2.5 bg-muni-600 hover:bg-muni-700 text-white font-bold text-xs rounded-lg shadow transition">
+                Selección →
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      contenedor.innerHTML = `<div class="col-span-full py-8 text-center text-red-500 text-xs">Error cargando iniciativas: ${err.message}</div>`;
+    }
+  };
+
+  window.irASeleccionMercado = function(idIniciativa) {
+    if (typeof cambiarSeccion === 'function') {
+      cambiarSeccion('seleccion');
+    }
+    const sel = document.getElementById('selIniciativaSeleccion');
+    if (sel && idIniciativa) {
+      sel.value = idIniciativa;
+      cambiarMercadoSeleccion(idIniciativa);
+    }
+  };
+
+  window.mostrarModalCrearIniciativa = function() {
+    const f = document.getElementById('formCrearIniciativa');
+    if (f) f.reset();
+    const idInput = document.getElementById('iniIdIniciativa');
+    if (idInput) idInput.value = '';
+    const titulo = document.getElementById('tituloModalIniciativa');
+    if (titulo) titulo.textContent = 'Registrar Nuevo Mercado / Convocatoria';
+    const subtitulo = document.getElementById('subtituloModalIniciativa');
+    if (subtitulo) subtitulo.textContent = 'Parámetros oficiales del sistema de ferias de la Municipalidad de Santiago';
+    const btnSubmit = document.getElementById('btnSubmitIniciativa');
+    if (btnSubmit) btnSubmit.textContent = 'Guardar Mercado en Turso';
+
+    const m = document.getElementById('modalCrearIniciativa');
+    if (m) m.classList.remove('hidden');
+  };
+
+  window.cerrarModalCrearIniciativa = function() {
+    const m = document.getElementById('modalCrearIniciativa');
+    if (m) m.classList.add('hidden');
+    const f = document.getElementById('formCrearIniciativa');
+    if (f) f.reset();
+    const idInput = document.getElementById('iniIdIniciativa');
+    if (idInput) idInput.value = '';
+  };
+
+  window.abrirModalEditarIniciativa = async function(idIniciativa) {
+    if (!idIniciativa) return;
+    try {
+      let ini = (window.listaIniciativasGlobal || []).find(i => i.id_iniciativa === idIniciativa);
+      if (!ini) {
+        const res = await call('apiDetalleMercadoIntegral', idIniciativa);
+        if (res && res.success && res.data && res.data.iniciativa) {
+          ini = res.data.iniciativa;
+        }
+      }
+
+      if (!ini) {
+        mostrarToast('No se encontraron los datos del mercado para editar.', 'error');
+        return;
+      }
+
+      // Rellenar formulario con los datos existentes
+      const idInput = document.getElementById('iniIdIniciativa');
+      if (idInput) idInput.value = ini.id_iniciativa;
+      const elNombre = document.getElementById('iniNombre');
+      if (elNombre) elNombre.value = ini.nombre || '';
+      const elTipo = document.getElementById('iniTipo');
+      if (elTipo) elTipo.value = ini.tipo || 'FERIA';
+      const elTematica = document.getElementById('iniTematica');
+      if (elTematica) elTematica.value = ini.tematica || 'Artesanía y Oficios Tradicionales';
+      const elEstado = document.getElementById('iniEstado');
+      if (elEstado) elEstado.value = ini.estado || 'ABIERTA';
+      const elObjetivo = document.getElementById('iniObjetivo');
+      if (elObjetivo) elObjetivo.value = ini.objetivo || '';
+      const elBarrio = document.getElementById('iniBarrio');
+      if (elBarrio) elBarrio.value = ini.barrio || 'Barrio Lastarria';
+      const elUbicacion = document.getElementById('iniUbicacion');
+      if (elUbicacion) elUbicacion.value = ini.lugar || ini.ubicacion || '';
+      const elEntidad = document.getElementById('iniEntidadOrganizadora');
+      if (elEntidad) elEntidad.value = ini.entidad_organizadora || 'Subdirección de Desarrollo Económico Local - DIDECO';
+      const elResponsable = document.getElementById('iniResponsable');
+      if (elResponsable) elResponsable.value = ini.responsable || 'Equipo de Fomento Productivo';
+      const elCuposTit = document.getElementById('iniCuposTitulares');
+      if (elCuposTit) elCuposTit.value = ini.cupos_titulares || 20;
+      const elCuposSup = document.getElementById('iniCuposSuplentes');
+      if (elCuposSup) elCuposSup.value = ini.cupos_suplentes || 10;
+      const elFechaInicioPost = document.getElementById('iniFechaInicioPost');
+      if (elFechaInicioPost) elFechaInicioPost.value = ini.fecha_inicio_postulacion || '';
+      const elFechaCierrePost = document.getElementById('iniFechaCierrePost');
+      if (elFechaCierrePost) elFechaCierrePost.value = ini.fecha_cierre_postulacion || '';
+      const elFechaEjecInicio = document.getElementById('iniFechaEjecInicio');
+      if (elFechaEjecInicio) elFechaEjecInicio.value = ini.fecha_ejecucion_inicio || '';
+      const elFechaEjecFin = document.getElementById('iniFechaEjecFin');
+      if (elFechaEjecFin) elFechaEjecFin.value = ini.fecha_ejecucion_fin || '';
+      const elUrlForm = document.getElementById('iniUrlFormulario');
+      if (elUrlForm) elUrlForm.value = ini.url_formulario || '';
+
+      // Títulos y botones dinámicos
+      const titulo = document.getElementById('tituloModalIniciativa');
+      if (titulo) titulo.textContent = 'Editar y Corregir Mercado / Convocatoria';
+      const subtitulo = document.getElementById('subtituloModalIniciativa');
+      if (subtitulo) subtitulo.textContent = 'Actualice fechas, cupos, temáticas o estado del mercado en Turso';
+      const btnSubmit = document.getElementById('btnSubmitIniciativa');
+      if (btnSubmit) btnSubmit.textContent = 'Guardar Cambios en Turso';
+
+      const m = document.getElementById('modalCrearIniciativa');
+      if (m) m.classList.remove('hidden');
+    } catch (err) {
+      mostrarToast('Error al abrir editor del mercado: ' + err.message, 'error');
+    }
+  };
+
+  window.editarMercadoActual = function() {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione un mercado primero para editar.', 'warning');
+      return;
+    }
+    abrirModalEditarIniciativa(idIniciativa);
+  };
+
+  window.guardarNuevaIniciativa = async function(e) {
+    if (e) e.preventDefault();
+    const idIniciativa = document.getElementById('iniIdIniciativa')?.value;
+    const nombre = document.getElementById('iniNombre')?.value;
+    const tipo = document.getElementById('iniTipo')?.value || 'FERIA';
+    const tematica = document.getElementById('iniTematica')?.value || '';
+    const estado = document.getElementById('iniEstado')?.value || 'ABIERTA';
+    const objetivo = document.getElementById('iniObjetivo')?.value || '';
+    const barrio = document.getElementById('iniBarrio')?.value || '';
+    const ubicacion = document.getElementById('iniUbicacion')?.value || 'Santiago';
+    const entidadOrganizadora = document.getElementById('iniEntidadOrganizadora')?.value || '';
+    const responsable = document.getElementById('iniResponsable')?.value || '';
+    const cuposTitulares = parseInt(document.getElementById('iniCuposTitulares')?.value, 10) || 20;
+    const cuposSuplentes = parseInt(document.getElementById('iniCuposSuplentes')?.value, 10) || 10;
+    const fechaInicioPost = document.getElementById('iniFechaInicioPost')?.value || null;
+    const fechaCierrePost = document.getElementById('iniFechaCierrePost')?.value || null;
+    const fechaEjecInicio = document.getElementById('iniFechaEjecInicio')?.value || null;
+    const fechaEjecFin = document.getElementById('iniFechaEjecFin')?.value || null;
+    const urlFormulario = document.getElementById('iniUrlFormulario')?.value || null;
+
+    if (!nombre) {
+      mostrarToast('Indique el nombre del mercado o feria.', 'error');
+      return;
+    }
+
+    const payload = {
+      idIniciativa: idIniciativa || undefined,
+      nombre: nombre,
+      tipo: tipo,
+      tematica: tematica,
+      estado: estado,
+      objetivo: objetivo,
+      barrio: barrio,
+      ubicacion: ubicacion,
+      lugar: ubicacion,
+      entidadOrganizadora: entidadOrganizadora,
+      responsable: responsable,
+      cuposTitulares: cuposTitulares,
+      cuposSuplentes: cuposSuplentes,
+      fechaInicioPostulacion: fechaInicioPost,
+      fechaCierrePostulacion: fechaCierrePost,
+      fechaEjecucionInicio: fechaEjecInicio,
+      fechaEjecucionFin: fechaEjecFin,
+      urlFormulario: urlFormulario
+    };
+
+    try {
+      const endpoint = idIniciativa ? 'apiIniciativaActualizar' : 'apiIniciativaCrear';
+      const res = await call(endpoint, payload);
+
+      if (res && res.success) {
+        mostrarToast(idIniciativa ? 'Mercado actualizado exitosamente en Turso.' : 'Mercado registrado exitosamente en Turso.', 'success');
+        cerrarModalCrearIniciativa();
+        cargarIniciativas();
+        cargarSelectorIniciativasSeleccion();
+        if (idIniciativa && typeof cambiarMercadoSeleccion === 'function') {
+          cambiarMercadoSeleccion(idIniciativa);
+        }
+      } else {
+        mostrarToast(res?.error || 'No se pudo guardar el mercado', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  window.abrirModalPostular = function(idIniciativa, nombreIniciativa) {
+    document.getElementById('postularIdIniciativa').value = idIniciativa;
+    const lbl = document.getElementById('modalPostularIniciativaNombre');
+    if (lbl) lbl.textContent = nombreIniciativa || '';
+    const m = document.getElementById('modalPostular');
+    if (m) m.classList.remove('hidden');
+  };
+
+  window.cerrarModalPostular = function() {
+    const m = document.getElementById('modalPostular');
+    if (m) m.classList.add('hidden');
+    const f = document.getElementById('formPostular');
+    if (f) f.reset();
+  };
+
+  window.guardarPostulacionEmprendedor = async function(e) {
+    if (e) e.preventDefault();
+    const idIniciativa = document.getElementById('postularIdIniciativa')?.value;
+    const rut = document.getElementById('postularRut')?.value;
+
+    if (!idIniciativa || !rut) {
+      mostrarToast('Ingrese el RUT del emprendedor postulante.', 'error');
+      return;
+    }
+
+    try {
+      const res = await call('apiPostulacionRegistrar', {
+        idIniciativa: idIniciativa,
+        rut: rut
+      });
+
+      if (res && res.success) {
+        mostrarToast('Postulación registrada exitosamente en Turso.', 'success');
+        cerrarModalPostular();
+      } else {
+        mostrarToast(res?.error || 'Error registrando postulación', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // =========================================================
+  // GESTIÓN DE SELECCIÓN EN 2 CAMINOS (MASIVA Y DIRECTA)
+  // =========================================================
+  let listaPostulacionesMercadoActual = [];
+  let listaDisponiblesMercadoActual = [];
+  let iniciativaSeleccionadaActual = null;
+  let tabSeleccionActiva = 'camino1';
+
+  window.inicializarVistaSeleccion = async function() {
+    await cargarSelectorIniciativasSeleccion();
+    cargarPadronDisponiblesGeneral();
+  };
+
+  window.cargarSelectorIniciativasSeleccion = async function() {
+    const sel = document.getElementById('selIniciativaSeleccion');
+    if (!sel) return;
+    try {
+      const res = await call('apiIniciativasListar', {});
+      const lista = (res && res.success && res.data) ? res.data : [];
+      if (lista.length === 0) {
+        sel.innerHTML = '<option value="">No hay ferias registradas</option>';
+        return;
+      }
+      sel.innerHTML = lista.map(i => `<option value="${i.id_iniciativa}">${escapeHtml(i.nombre)} (${i.codigo || ''})</option>`).join('');
+      
+      // Cargar automáticamente la primera feria
+      if (sel.value) {
+        cambiarMercadoSeleccion(sel.value);
+      }
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error cargando ferias</option>';
+    }
+  };
+
+  window.cambiarMercadoSeleccion = async function(idIniciativa) {
+    if (!idIniciativa) return;
+    const tbody = document.getElementById('tablaPostulantesBody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Consultando postulaciones en Turso...</td></tr>';
+    }
+
+    try {
+      // 1. Obtener datos de la iniciativa y métricas
+      const resDetalle = await call('apiDetalleMercadoIntegral', idIniciativa);
+      if (resDetalle && resDetalle.success && resDetalle.data) {
+        iniciativaSeleccionadaActual = resDetalle.data.iniciativa;
+        const m = resDetalle.data.metricas || {};
+        const ini = resDetalle.data.iniciativa || {};
+
+        const elTot = document.getElementById('selTotalPostulantes');
+        const elTit = document.getElementById('selTitularesCupo');
+        const elSup = document.getElementById('selSuplentesCupo');
+
+        if (elTot) elTot.textContent = m.totalPostulantes || 0;
+        if (elTit) elTit.textContent = `${m.titularesConfirmados || 0} / ${ini.cupos_titulares || 20}`;
+        if (elSup) elSup.textContent = `${m.suplentes || 0} / ${ini.cupos_suplentes || 10}`;
+      }
+
+      // 2. Obtener lista de postulaciones detalladas (Camino 1)
+      const resPost = await call('apiListarPostulacionesMercado', idIniciativa);
+      if (resPost && resPost.success) {
+        listaPostulacionesMercadoActual = resPost.data || [];
+        const badge = document.getElementById('badgeConteoPostulantes');
+        if (badge) badge.textContent = listaPostulacionesMercadoActual.length;
+
+        // Actualizar contador y título de seleccionados
+        const seleccionados = listaPostulacionesMercadoActual.filter(p => p.estado_postulacion === 'TITULAR' || p.estado_postulacion === 'SUPLENTE');
+        const badgeSel = document.getElementById('badgeConteoSeleccionados');
+        if (badgeSel) badgeSel.textContent = seleccionados.length;
+        const lblNom = document.getElementById('lblMercadoNominaSeleccionados');
+        if (lblNom && iniciativaSeleccionadaActual) {
+          lblNom.textContent = iniciativaSeleccionadaActual.nombre || 'Mercado Actual';
+        }
+
+        filtrarTablaPostulantes();
+        if (tabSeleccionActiva === 'seleccionados') {
+          renderPanelSeleccionados();
+        }
+      } else {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-rose-500">${resPost?.error || 'Error al obtener postulaciones'}</td></tr>`;
+      }
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-rose-500">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  };
+
+  window.cambiarTabSeleccion = function(tab) {
+    tabSeleccionActiva = tab;
+    const btn1 = document.getElementById('tabBtnCamino1');
+    const btn2 = document.getElementById('tabBtnCamino2');
+    const btn3 = document.getElementById('tabBtnSeleccionados');
+    const p1 = document.getElementById('panelCamino1');
+    const p2 = document.getElementById('panelCamino2');
+    const p3 = document.getElementById('panelSeleccionados');
+
+    // Desactivar todos los botones y paneles
+    [btn1, btn2, btn3].forEach(b => {
+      b?.classList.remove('border-muni-700', 'text-muni-900', 'border-emerald-600', 'text-emerald-800');
+      b?.classList.add('border-transparent', 'text-slate-500');
+    });
+    [p1, p2, p3].forEach(p => p?.classList.add('hidden'));
+
+    if (tab === 'camino1') {
+      btn1?.classList.add('border-muni-700', 'text-muni-900');
+      btn1?.classList.remove('border-transparent', 'text-slate-500');
+      p1?.classList.remove('hidden');
+    } else if (tab === 'camino2') {
+      btn2?.classList.add('border-muni-700', 'text-muni-900');
+      btn2?.classList.remove('border-transparent', 'text-slate-500');
+      p2?.classList.remove('hidden');
+    } else if (tab === 'seleccionados') {
+      btn3?.classList.add('border-emerald-600', 'text-emerald-800');
+      btn3?.classList.remove('border-transparent', 'text-slate-500');
+      p3?.classList.remove('hidden');
+      renderPanelSeleccionados();
+    }
+  };
+
+  // --- FILTRADO Y RENDER DE CAMINO 1: POSTULANTES ---
+  window.filtrarTablaPostulantes = function() {
+    const texto = (document.getElementById('filtroTextoPostulantes')?.value || '').toLowerCase().trim();
+    const rubro = document.getElementById('filtroRubroPostulantes')?.value || '';
+    const estado = document.getElementById('filtroEstadoPostulantes')?.value || '';
+    const formSii = document.getElementById('filtroFormalizacionPostulantes')?.value || '';
+
+    const filtrados = listaPostulacionesMercadoActual.filter(p => {
+      const matchTexto = !texto || 
+        (p.nombre_comercial && p.nombre_comercial.toLowerCase().includes(texto)) ||
+        (p.nombres && p.nombres.toLowerCase().includes(texto)) ||
+        (p.apellidos && p.apellidos.toLowerCase().includes(texto)) ||
+        (p.rut && p.rut.toLowerCase().includes(texto)) ||
+        (p.rut_formateado && p.rut_formateado.toLowerCase().includes(texto));
+
+      const matchRubro = !rubro || (p.rubro === rubro);
+      const matchEstado = !estado || (p.estado_postulacion === estado);
+      const matchForm = !formSii || (p.formalizacion_sii === formSii);
+
+      return matchTexto && matchRubro && matchEstado && matchForm;
+    });
+
+    renderTablaPostulaciones(filtrados);
+    actualizarContadorPostulantesSeleccionados();
+  };
+
+  function renderTablaPostulaciones(lista) {
+    const tbody = document.getElementById('tablaPostulantesBody');
+    if (!tbody) return;
+
+    if (!lista || lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No hay postulaciones que coincidan con los filtros.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = lista.map(p => {
+      const rut = p.rut_formateado || p.rut || '—';
+      const nombreTitular = `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'Sin Nombre';
+      const negocio = p.nombre_comercial || p.nombre_fantasia || 'Sin negocio';
+      const rubro = p.rubro || 'OTRO';
+      const subrubro = p.subrubro || '';
+      const formalizacion = (p.formalizacion_sii || 'SIN_INICIO').replace(/_/g, ' ');
+      const rsh = p.tramo_rsh ? `${p.tramo_rsh}% RSH` : 'Sin RSH';
+      const estado = p.estado_postulacion || 'INGRESADA';
+
+      let estadoClase = 'bg-slate-100 text-slate-700 border-slate-200';
+      if (estado === 'TITULAR') estadoClase = 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold';
+      else if (estado === 'SUPLENTE') estadoClase = 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
+      else if (estado === 'ADMISIBLE') estadoClase = 'bg-blue-100 text-blue-800 border-blue-200';
+      else if (estado === 'RECHAZADA') estadoClase = 'bg-rose-100 text-rose-800 border-rose-200';
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100 ${estado === 'TITULAR' ? 'bg-emerald-50/20' : ''}">
+          <td class="px-3 py-3.5 text-center">
+            <input type="checkbox" value="${p.id_postulacion}" onchange="actualizarContadorPostulantesSeleccionados()" class="chkPostulacionItem rounded text-muni-600 focus:ring-muni-500">
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-bold text-slate-800">${escapeHtml(negocio)}</div>
+            ${p.instagram ? `<div class="text-[10px] text-pink-600 font-medium">${escapeHtml(p.instagram)}</div>` : ''}
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-semibold text-slate-700">${escapeHtml(nombreTitular)}</div>
+            <div class="text-xs font-mono text-muni-700 font-bold">${escapeHtml(rut)}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-medium text-slate-700">${escapeHtml(rubro)}</div>
+            <div class="text-[11px] text-slate-400 truncate max-w-[180px]">${escapeHtml(subrubro)}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              ${escapeHtml(formalizacion)}
+            </span>
+            <div class="text-[11px] text-slate-500 mt-0.5 font-medium">${escapeHtml(rsh)}</div>
+          </td>
+          <td class="px-3 py-3.5 text-center">
+            <button type="button" onclick="abrirModalDocumentosEmprendedor('${p.id_emprendimiento || p.id_persona || p.rut}', '${escapeHtml(negocio).replace(/'/g, "\\'")}', '${escapeHtml(nombreTitular).replace(/'/g, "\\'")}', '${escapeHtml(rut).replace(/'/g, "\\'")}', '${escapeHtml(rubro).replace(/'/g, "\\'")}')" 
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${p.tiene_fotos ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}">
+              <span>📁</span>
+              <span>${p.total_documentos ? p.total_documentos + ' docs' : 'Ver docs'}</span>
+              ${p.tiene_fotos ? '<span title="Tiene fotos/catálogo de productos" class="text-pink-600 font-extrabold text-[10px]">📷</span>' : ''}
+              ${p.tiene_sanitaria ? '<span title="Resolución Sanitaria verificada" class="text-emerald-600 font-extrabold text-[10px]">🧪</span>' : ''}
+            </button>
+          </td>
+          <td class="px-4 py-3.5">
+            <span class="inline-flex px-2.5 py-1 rounded-full text-[11px] border ${estadoClase}">
+              ${escapeHtml(estado)}
+            </span>
+          </td>
+          <td class="px-4 py-3.5 text-right">
+            <select onchange="actualizarEstadoIndividualPostulacion('${p.id_postulacion}', this.value)" 
+                    class="text-xs px-2 py-1 border border-slate-300 rounded bg-white font-medium hover:border-muni-500 focus:ring-1 focus:ring-muni-500">
+              <option value="TITULAR" ${estado === 'TITULAR' ? 'selected' : ''}>⭐ Titular</option>
+              <option value="SUPLENTE" ${estado === 'SUPLENTE' ? 'selected' : ''}>⚑ Suplente</option>
+              <option value="ADMISIBLE" ${estado === 'ADMISIBLE' ? 'selected' : ''}>ℹ Admisible</option>
+              <option value="INGRESADA" ${estado === 'INGRESADA' ? 'selected' : ''}>⏳ Ingresada</option>
+              <option value="RECHAZADA" ${estado === 'RECHAZADA' ? 'selected' : ''}>✕ Rechazar</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  window.toggleSeleccionarTodosPostulantes = function(checked) {
+    const checks = document.querySelectorAll('.chkPostulacionItem');
+    checks.forEach(c => c.checked = checked);
+    actualizarContadorPostulantesSeleccionados();
+  };
+
+  function actualizarContadorPostulantesSeleccionados() {
+    const checks = document.querySelectorAll('.chkPostulacionItem:checked');
+    const lbl = document.getElementById('lblSeleccionadosPostulantes');
+    if (lbl) lbl.textContent = `${checks.length} seleccionados`;
+  }
+
+  window.actualizarEstadoIndividualPostulacion = async function(idPostulacion, nuevoEstado) {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa || !idPostulacion) return;
+
+    try {
+      const res = await call('apiActualizarEstadoPostulacionesMasivo', {
+        idIniciativa: idIniciativa,
+        idsPostulaciones: [idPostulacion],
+        nuevoEstado: nuevoEstado
+      });
+
+      if (res && res.success) {
+        mostrarToast(`Estado actualizado a ${nuevoEstado}.`, 'success');
+        cambiarMercadoSeleccion(idIniciativa);
+      } else {
+        mostrarToast(res?.error || 'Error al actualizar estado', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  window.asignarMasivoPostulantes = async function(nuevoEstado) {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione una iniciativa primero.', 'error');
+      return;
+    }
+
+    const checks = Array.from(document.querySelectorAll('.chkPostulacionItem:checked'));
+    if (checks.length === 0) {
+      mostrarToast('Debe marcar al menos un postulante en la tabla.', 'error');
+      return;
+    }
+
+    const ids = checks.map(c => c.value);
+
+    try {
+      const res = await call('apiActualizarEstadoPostulacionesMasivo', {
+        idIniciativa: idIniciativa,
+        idsPostulaciones: ids,
+        nuevoEstado: nuevoEstado
+      });
+
+      if (res && res.success) {
+        mostrarToast(`Se asignaron ${ids.length} postulantes como ${nuevoEstado} exitosamente.`, 'success');
+        // Desmarcar cabecera
+        const chkAll = document.getElementById('chkTodosPostulantes');
+        if (chkAll) chkAll.checked = false;
+        cambiarMercadoSeleccion(idIniciativa);
+      } else {
+        mostrarToast(res?.error || 'Error al procesar asignación masiva', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // --- FILTRADO Y RENDER DE CAMINO 2: PADRÓN GENERAL DISPONIBLE ---
+  window.cargarPadronDisponiblesGeneral = async function() {
+    const tbody = document.getElementById('tablaDisponiblesBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Cargando base comunal de emprendedores...</td></tr>';
+
+    try {
+      const res = await call('apiListarEmprendedoresDisponibles', {});
+      if (res && res.success) {
+        listaDisponiblesMercadoActual = res.data || [];
+        const badge = document.getElementById('badgeConteoDisponibles');
+        const badgeTot = document.getElementById('selDisponiblesTotal');
+        if (badge) badge.textContent = listaDisponiblesMercadoActual.length;
+        if (badgeTot) badgeTot.textContent = listaDisponiblesMercadoActual.length;
+        filtrarTablaDisponibles();
+      } else {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-rose-500">${res?.error || 'Error al cargar padrón'}</td></tr>`;
+      }
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-rose-500">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  };
+
+  window.filtrarTablaDisponibles = function() {
+    const texto = (document.getElementById('filtroTextoDisponibles')?.value || '').toLowerCase().trim();
+    const rubro = document.getElementById('filtroRubroDisponibles')?.value || '';
+    const formSii = document.getElementById('filtroFormalizacionDisponibles')?.value || '';
+    const comuna = document.getElementById('filtroComunaDisponibles')?.value || '';
+
+    const filtrados = listaDisponiblesMercadoActual.filter(e => {
+      const matchTexto = !texto ||
+        (e.nombre_comercial && e.nombre_comercial.toLowerCase().includes(texto)) ||
+        (e.nombres && e.nombres.toLowerCase().includes(texto)) ||
+        (e.apellidos && e.apellidos.toLowerCase().includes(texto)) ||
+        (e.rut && e.rut.toLowerCase().includes(texto)) ||
+        (e.rut_formateado && e.rut_formateado.toLowerCase().includes(texto));
+
+      const matchRubro = !rubro || (e.rubro === rubro);
+      const matchForm = !formSii || (e.formalizacion_sii === formSii);
+      const matchComuna = !comuna || (e.comuna === comuna);
+
+      return matchTexto && matchRubro && matchForm && matchComuna;
+    });
+
+    renderTablaDisponibles(filtrados);
+    actualizarContadorDisponiblesSeleccionados();
+  };
+
+  function renderTablaDisponibles(lista) {
+    const tbody = document.getElementById('tablaDisponiblesBody');
+    if (!tbody) return;
+
+    if (!lista || lista.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No se encontraron emprendedores en el padrón con los filtros seleccionados.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = lista.map(e => {
+      const rut = e.rut_formateado || e.rut || '—';
+      const nombreTitular = `${e.nombres || ''} ${e.apellidos || ''}`.trim() || 'Sin Nombre';
+      const negocio = e.nombre_comercial || e.nombre_fantasia || 'Emprendimiento';
+      const rubro = e.rubro || 'OTRO';
+      const subrubro = e.subrubro || '';
+      const formalizacion = (e.formalizacion_sii || 'SIN_INICIO').replace(/_/g, ' ');
+      const rsh = e.tramo_rsh ? `${e.tramo_rsh}% RSH` : 'Sin RSH';
+      const feriasCount = e.ferias_participadas || 0;
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="px-3 py-3.5 text-center">
+            <input type="checkbox" value="${e.id_emprendimiento}" onchange="actualizarContadorDisponiblesSeleccionados()" class="chkDisponibleItem rounded text-emerald-600 focus:ring-emerald-500">
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-bold text-slate-800">${escapeHtml(negocio)}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(e.codigo_comercial || '')}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-semibold text-slate-700">${escapeHtml(nombreTitular)}</div>
+            <div class="text-xs font-mono text-emerald-700 font-bold">${escapeHtml(rut)}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            <div class="font-medium text-slate-700">${escapeHtml(rubro)}</div>
+            <div class="text-[11px] text-slate-400 truncate max-w-[180px]">${escapeHtml(subrubro)}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              ${escapeHtml(formalizacion)}
+            </span>
+            <div class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(rsh)} · ${escapeHtml(e.comuna || 'Santiago')}</div>
+          </td>
+          <td class="px-3 py-3.5 text-center">
+            <button type="button" onclick="abrirModalDocumentosEmprendedor('${e.id_emprendimiento || e.id_persona || e.rut}', '${escapeHtml(negocio).replace(/'/g, "\\'")}', '${escapeHtml(nombreTitular).replace(/'/g, "\\'")}', '${escapeHtml(rut).replace(/'/g, "\\'")}', '${escapeHtml(rubro).replace(/'/g, "\\'")}')" 
+                    class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${e.tiene_fotos ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}">
+              <span>📁</span>
+              <span>${e.total_documentos ? e.total_documentos + ' docs' : 'Ver docs'}</span>
+              ${e.tiene_fotos ? '<span title="Tiene fotos/catálogo de productos" class="text-pink-600 font-extrabold text-[10px]">📷</span>' : ''}
+              ${e.tiene_sanitaria ? '<span title="Resolución Sanitaria verificada" class="text-emerald-600 font-extrabold text-[10px]">🧪</span>' : ''}
+            </button>
+          </td>
+          <td class="px-4 py-3.5">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${feriasCount > 0 ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-600'}">
+              ${feriasCount} feria${feriasCount === 1 ? '' : 's'}
+            </span>
+          </td>
+          <td class="px-4 py-3.5 text-right">
+            <button type="button" onclick="incorporarIndividualDisponible('${e.id_emprendimiento}', 'TITULAR')" 
+                    class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded transition flex items-center gap-1 ml-auto">
+              <span>+</span> Asignar
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  window.toggleSeleccionarTodosDisponibles = function(checked) {
+    const checks = document.querySelectorAll('.chkDisponibleItem');
+    checks.forEach(c => c.checked = checked);
+    actualizarContadorDisponiblesSeleccionados();
+  };
+
+  function actualizarContadorDisponiblesSeleccionados() {
+    const checks = document.querySelectorAll('.chkDisponibleItem:checked');
+    const lbl = document.getElementById('lblSeleccionadosDisponibles');
+    if (lbl) lbl.textContent = `${checks.length} seleccionados`;
+  }
+
+  window.incorporarIndividualDisponible = async function(idEmprendimiento, estadoInicial) {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione la iniciativa a la cual incorporar.', 'error');
+      return;
+    }
+
+    try {
+      const res = await call('apiIncorporarEmprendedoresAMercadoMasivo', {
+        idIniciativa: idIniciativa,
+        idsEmprendimientos: [idEmprendimiento],
+        estadoInicial: estadoInicial || 'TITULAR'
+      });
+
+      if (res && res.success) {
+        mostrarToast('Emprendedor incorporado exitosamente a la feria.', 'success');
+        cambiarMercadoSeleccion(idIniciativa);
+      } else {
+        mostrarToast(res?.error || 'Error al incorporar emprendedor', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  window.incorporarMasivoDisponibles = async function(estadoInicial) {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione la iniciativa activa para incorporar.', 'error');
+      return;
+    }
+
+    const checks = Array.from(document.querySelectorAll('.chkDisponibleItem:checked'));
+    if (checks.length === 0) {
+      mostrarToast('Debe marcar al menos un emprendedor del padrón.', 'error');
+      return;
+    }
+
+    const ids = checks.map(c => c.value);
+
+    try {
+      const res = await call('apiIncorporarEmprendedoresAMercadoMasivo', {
+        idIniciativa: idIniciativa,
+        idsEmprendimientos: ids,
+        estadoInicial: estadoInicial || 'TITULAR'
+      });
+
+      if (res && res.success) {
+        mostrarToast(`Se incorporaron ${ids.length} emprendedores como ${estadoInicial} exitosamente.`, 'success');
+        const chkAll = document.getElementById('chkTodosDisponibles');
+        if (chkAll) chkAll.checked = false;
+        // Refrescar ambas vistas
+        cambiarMercadoSeleccion(idIniciativa);
+        cambiarTabSeleccion('camino1');
+      } else {
+        mostrarToast(res?.error || 'Error al incorporar emprendedores', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // =========================================================
+  // NÓMINA OFICIAL DE SELECCIONADOS (TITULARES Y SUPLENTES)
+  // =========================================================
+  let filtroTipoSeleccionadosActual = 'TODOS';
+
+  window.filtrarTipoSeleccionados = function(tipo) {
+    filtroTipoSeleccionadosActual = tipo;
+    const btnTodos = document.getElementById('btnFiltroSelTodos');
+    const btnTit = document.getElementById('btnFiltroSelTitular');
+    const btnSup = document.getElementById('btnFiltroSelSuplente');
+
+    [btnTodos, btnTit, btnSup].forEach(b => {
+      b?.classList.remove('bg-slate-800', 'text-white');
+      b?.classList.add('bg-slate-100', 'text-slate-700');
+    });
+
+    if (tipo === 'TODOS') {
+      btnTodos?.classList.remove('bg-slate-100', 'text-slate-700');
+      btnTodos?.classList.add('bg-slate-800', 'text-white');
+    } else if (tipo === 'TITULAR') {
+      btnTit?.classList.remove('bg-slate-100', 'text-slate-700');
+      btnTit?.classList.add('bg-slate-800', 'text-white');
+    } else if (tipo === 'SUPLENTE') {
+      btnSup?.classList.remove('bg-slate-100', 'text-slate-700');
+      btnSup?.classList.add('bg-slate-800', 'text-white');
+    }
+
+    filtrarTablaSeleccionados();
+  };
+
+  window.filtrarTablaSeleccionados = function() {
+    const texto = (document.getElementById('filtroTextoSeleccionados')?.value || '').toLowerCase().trim();
+    const todosSeleccionados = (listaPostulacionesMercadoActual || []).filter(p => 
+      p.estado_postulacion === 'TITULAR' || p.estado_postulacion === 'SUPLENTE'
+    );
+
+    const filtrados = todosSeleccionados.filter(p => {
+      const matchTipo = (filtroTipoSeleccionadosActual === 'TODOS') || (p.estado_postulacion === filtroTipoSeleccionadosActual);
+      const matchTexto = !texto ||
+        (p.nombre_comercial && p.nombre_comercial.toLowerCase().includes(texto)) ||
+        (p.nombres && p.nombres.toLowerCase().includes(texto)) ||
+        (p.apellidos && p.apellidos.toLowerCase().includes(texto)) ||
+        (p.rut && p.rut.toLowerCase().includes(texto)) ||
+        (p.rut_formateado && p.rut_formateado.toLowerCase().includes(texto)) ||
+        (p.rubro && p.rubro.toLowerCase().includes(texto)) ||
+        (p.telefono && p.telefono.toLowerCase().includes(texto)) ||
+        (p.email && p.email.toLowerCase().includes(texto));
+
+      return matchTipo && matchTexto;
+    });
+
+    renderTablaSeleccionados(filtrados);
+  };
+
+  window.renderPanelSeleccionados = function() {
+    const todosSeleccionados = (listaPostulacionesMercadoActual || []).filter(p => 
+      p.estado_postulacion === 'TITULAR' || p.estado_postulacion === 'SUPLENTE'
+    );
+
+    const titulares = todosSeleccionados.filter(p => p.estado_postulacion === 'TITULAR');
+    const suplentes = todosSeleccionados.filter(p => p.estado_postulacion === 'SUPLENTE');
+
+    const cntTodos = document.getElementById('cntSelTodos');
+    const cntTit = document.getElementById('cntSelTitulares');
+    const cntSup = document.getElementById('cntSelSuplentes');
+    const badgeSel = document.getElementById('badgeConteoSeleccionados');
+
+    if (cntTodos) cntTodos.textContent = todosSeleccionados.length;
+    if (cntTit) cntTit.textContent = titulares.length;
+    if (cntSup) cntSup.textContent = suplentes.length;
+    if (badgeSel) badgeSel.textContent = todosSeleccionados.length;
+
+    filtrarTablaSeleccionados();
+  };
+
+  function renderTablaSeleccionados(lista) {
+    const tbody = document.getElementById('tablaSeleccionadosBody');
+    if (!tbody) return;
+
+    if (!lista || lista.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="px-4 py-8 text-center text-slate-400">
+            No hay adjudicatarios seleccionados bajo los filtros actuales. Puede asignar titulares y suplentes desde las pestañas de Postulantes o Padrón Comunal.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Ordenar primero Titulares y luego Suplentes
+    const ordenados = [...lista].sort((a, b) => {
+      if (a.estado_postulacion === b.estado_postulacion) return 0;
+      return a.estado_postulacion === 'TITULAR' ? -1 : 1;
+    });
+
+    tbody.innerHTML = ordenados.map((p, idx) => {
+      const esTitular = p.estado_postulacion === 'TITULAR';
+      const badgeCupo = esTitular 
+        ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+             <span>👑</span> TITULAR #${idx + 1}
+           </span>`
+        : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+             <span>⏳</span> SUPLENTE
+           </span>`;
+
+      const nombreTitular = `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'Sin Nombre';
+      const rut = p.rut_formateado || p.rut || '—';
+      const negocio = p.nombre_comercial || 'Emprendimiento';
+      const rubro = p.rubro || 'General';
+      const formalizacion = (p.formalizacion_sii || 'SIN_INICIO').replace(/_/g, ' ');
+      const rsh = p.tramo_rsh ? `${p.tramo_rsh}% RSH` : 'Sin RSH';
+
+      const tel = p.telefono ? `<a href="tel:${p.telefono}" class="text-blue-600 hover:underline flex items-center gap-1"><span>📞</span>${escapeHtml(p.telefono)}</a>` : '<span class="text-slate-400">Sin tel</span>';
+      const mail = p.email ? `<a href="mailto:${p.email}" class="text-slate-600 hover:underline flex items-center gap-1 truncate max-w-[160px]" title="${escapeHtml(p.email)}"><span>✉️</span>${escapeHtml(p.email)}</a>` : '';
+      const ig = p.red_instagram ? `<div class="text-[11px] text-pink-600 font-semibold truncate max-w-[160px]">📷 ${escapeHtml(p.red_instagram)}</div>` : '';
+
+      const btnCambioRol = esTitular
+        ? `<button type="button" onclick="cambiarEstadoPostulanteDirecto('${p.id_postulacion}', 'SUPLENTE')" class="px-2 py-1 text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded transition" title="Mover a lista de Suplentes">
+             ↓ A Suplente
+           </button>`
+        : `<button type="button" onclick="cambiarEstadoPostulanteDirecto('${p.id_postulacion}', 'TITULAR')" class="px-2 py-1 text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded transition" title="Ascender a Titular con puesto asegurado">
+             ↑ A Titular
+           </button>`;
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="px-3 py-3 text-center font-bold text-slate-500 font-mono">${idx + 1}</td>
+          <td class="px-3 py-3 whitespace-nowrap">${badgeCupo}</td>
+          <td class="px-4 py-3">
+            <div class="font-bold text-slate-800">${escapeHtml(negocio)}</div>
+            ${p.subrubro ? `<div class="text-[11px] text-slate-400 truncate max-w-[180px]">${escapeHtml(p.subrubro)}</div>` : ''}
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-semibold text-slate-700">${escapeHtml(nombreTitular)}</div>
+            <div class="text-xs font-mono text-emerald-700 font-bold">${escapeHtml(rut)}</div>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
+              ${escapeHtml(rubro)}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-xs space-y-0.5">
+            ${tel}
+            ${mail}
+            ${ig}
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-700 text-xs">${escapeHtml(formalizacion)}</div>
+            <div class="text-[11px] text-slate-500">${escapeHtml(rsh)}</div>
+          </td>
+          <td class="px-3 py-3 text-right whitespace-nowrap">
+            <div class="flex items-center justify-end gap-1.5">
+              ${btnCambioRol}
+              <button type="button" onclick="cambiarEstadoPostulanteDirecto('${p.id_postulacion}', 'RECHAZADA')" class="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Quitar cupo asignado">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  window.cambiarEstadoPostulanteDirecto = async function(idPostulacion, nuevoEstado) {
+    if (!idPostulacion) return;
+    try {
+      const res = await call('apiActualizarEstadoPostulacion', {
+        idPostulacion: idPostulacion,
+        nuevoEstado: nuevoEstado,
+        observaciones: `Actualización desde nómina de seleccionados a ${nuevoEstado}`
+      });
+      if (res && res.success) {
+        mostrarToast(`Estado actualizado a ${nuevoEstado} exitosamente.`, 'success');
+        const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+        if (idIniciativa) {
+          cambiarMercadoSeleccion(idIniciativa);
+        }
+      } else {
+        mostrarToast(res?.error || 'No se pudo actualizar el estado', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // =========================================================
+  // MÓDULO DE EXPORTACIÓN A EXCEL (COMPATIBLE .CSV UTF-8 BOM)
+  // =========================================================
+  window.descargarArchivoCSV = function(nombreArchivo, encabezados, filas) {
+    try {
+      const escapar = (val) => {
+        if (val === null || val === undefined) return '""';
+        let s = String(val).trim();
+        if (s.includes('"') || s.includes(';') || s.includes('\n') || s.includes('\r')) {
+          s = s.replace(/"/g, '""');
+        }
+        return `"${s}"`;
+      };
+
+      const lineaEncabezados = encabezados.map(escapar).join(';');
+      const lineasFilas = filas.map(fila => fila.map(escapar).join(';'));
+      const contenidoCompleto = [lineaEncabezados, ...lineasFilas].join('\r\n');
+
+      const blob = new Blob(['\uFEFF' + contenidoCompleto], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', nombreArchivo.endsWith('.csv') ? nombreArchivo : nombreArchivo + '.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      mostrarToast(`Archivo "${nombreArchivo}" generado y descargado exitosamente.`, 'success');
+    } catch (err) {
+      console.error('Error al exportar CSV:', err);
+      mostrarToast('Error al generar la exportación: ' + err.message, 'error');
+    }
+  };
+
+  window.exportarNominaSeleccionadosExcel = function() {
+    const todosSeleccionados = (listaPostulacionesMercadoActual || []).filter(p => 
+      p.estado_postulacion === 'TITULAR' || p.estado_postulacion === 'SUPLENTE'
+    );
+
+    if (todosSeleccionados.length === 0) {
+      mostrarToast('No hay participantes titulares o suplentes seleccionados para exportar en este mercado.', 'warning');
+      return;
+    }
+
+    const encabezados = [
+      'Tipo de Cupo',
+      'N° Orden',
+      'RUT Titular',
+      'Nombres Titular',
+      'Apellidos Titular',
+      'Emprendimiento / Nombre Comercial',
+      'Rubro Principal',
+      'Subrubro / Actividad',
+      'Formalización SII',
+      'Tramo RSH',
+      'Teléfono Contacto',
+      'Correo Electrónico',
+      'Instagram',
+      'Fecha Postulación / Asignación',
+      'Iniciativa / Mercado Asignado'
+    ];
+
+    const ordenados = [...todosSeleccionados].sort((a, b) => {
+      if (a.estado_postulacion === b.estado_postulacion) return 0;
+      return a.estado_postulacion === 'TITULAR' ? -1 : 1;
+    });
+
+    const nombreMercado = iniciativaSeleccionadaActual?.nombre || 'Mercado_Santiago';
+    const filas = ordenados.map((p, idx) => [
+      p.estado_postulacion,
+      idx + 1,
+      p.rut_formateado || p.rut || '',
+      p.nombres || '',
+      p.apellidos || '',
+      p.nombre_comercial || '',
+      p.rubro || '',
+      p.subrubro || '',
+      p.formalizacion_sii || '',
+      p.tramo_rsh ? `${p.tramo_rsh}%` : '',
+      p.telefono || '',
+      p.email || '',
+      p.red_instagram || '',
+      p.fecha_postulacion || '',
+      nombreMercado
+    ]);
+
+    const nombreArchivo = `Nomina_Seleccionados_${nombreMercado.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    descargarArchivoCSV(nombreArchivo, encabezados, filas);
+  };
+
+  window.exportarReporteMercadoActualExcel = async function() {
+    const idIniciativa = document.getElementById('selIniciativaSeleccion')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione un mercado para exportar su reporte.', 'warning');
+      return;
+    }
+
+    try {
+      mostrarToast('Generando reporte del mercado desde Turso...', 'info');
+      const res = await call('apiListarParticipantesSeguimiento', idIniciativa);
+      const participantes = (res && res.success && res.data) ? res.data : [];
+
+      const encabezados = [
+        'Mercado / Feria',
+        'Código Mercado',
+        'RUT Emprendedor',
+        'Titular',
+        'Emprendimiento',
+        'Rubro',
+        'Cupo Inicial',
+        'Asistencia Efectiva',
+        'Venta Total Declarada ($ CLP)',
+        'Seguidores Iniciales',
+        'Seguidores Finales',
+        'Crecimiento Redes',
+        'Observaciones Terreno'
+      ];
+
+      const nombreMercado = iniciativaSeleccionadaActual?.nombre || 'Mercado_Santiago';
+      const codigoMercado = iniciativaSeleccionadaActual?.codigo || '';
+
+      const filas = participantes.map(p => [
+        nombreMercado,
+        codigoMercado,
+        p.rut_formateado || p.rut || '',
+        `${p.nombres || ''} ${p.apellidos || ''}`.trim(),
+        p.nombre_comercial || '',
+        p.rubro || '',
+        p.estado_postulacion || 'TITULAR',
+        p.asistio === 1 ? 'PRESENTE' : (p.asistio === 0 ? 'AUSENTE' : 'PENDIENTE'),
+        p.venta_total_declarada || 0,
+        p.seguidores_iniciales || 0,
+        p.seguidores_finales || 0,
+        p.crecimiento_seguidores || 0,
+        p.observaciones || ''
+      ]);
+
+      const nombreArchivo = `Reporte_Mercado_${nombreMercado.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+      descargarArchivoCSV(nombreArchivo, encabezados, filas);
+    } catch (err) {
+      mostrarToast('Error generando reporte de mercado: ' + err.message, 'error');
+    }
+  };
+
+  window.exportarReporteConsolidadoGeneralExcel = async function() {
+    try {
+      mostrarToast('Consolidando métricas totales de todas las ferias...', 'info');
+      const res = await call('apiIniciativasListar', {});
+      const lista = (res && res.success && res.data) ? res.data : [];
+
+      if (lista.length === 0) {
+        mostrarToast('No hay ferias registradas para exportar.', 'warning');
+        return;
+      }
+
+      const encabezados = [
+        'Código Feria',
+        'Nombre del Mercado / Feria',
+        'Tipo de Iniciativa',
+        'Temática Oficial',
+        'Barrio Comunal',
+        'Lugar / Dirección',
+        'Estado Convocatoria',
+        'Cupos Titulares',
+        'Cupos Suplentes',
+        'Fecha Inicio Postulación',
+        'Fecha Cierre Postulación',
+        'Fecha Inicio Ejecución',
+        'Fecha Fin Ejecución',
+        'Entidad Organizadora',
+        'Responsable Municipal'
+      ];
+
+      const filas = lista.map(ini => [
+        ini.codigo || '',
+        ini.nombre || '',
+        ini.tipo || 'FERIA',
+        ini.tematica || '',
+        ini.barrio || '',
+        ini.lugar || ini.ubicacion || '',
+        ini.estado || 'ABIERTA',
+        ini.cupos_titulares || 20,
+        ini.cupos_suplentes || 10,
+        ini.fecha_inicio_postulacion || '',
+        ini.fecha_cierre_postulacion || '',
+        ini.fecha_ejecucion_inicio || '',
+        ini.fecha_ejecucion_fin || '',
+        ini.entidad_organizadora || '',
+        ini.responsable || ''
+      ]);
+
+      const nombreArchivo = `Reporte_Consolidado_Total_Ferias_Santiago_${new Date().toISOString().slice(0, 10)}.csv`;
+      descargarArchivoCSV(nombreArchivo, encabezados, filas);
+    } catch (err) {
+      mostrarToast('Error al exportar reporte consolidado: ' + err.message, 'error');
+    }
+  };
+
+  window.exportarPadronGeneralTotalExcel = async function() {
+    try {
+      mostrarToast('Consultando padrón comunal completo en Turso...', 'info');
+      const res = await call('apiFichasListar', { limit: 1000 });
+      const padron = (res && res.success && res.data) ? res.data : [];
+
+      if (padron.length === 0) {
+        mostrarToast('No hay emprendedores en el padrón para exportar.', 'warning');
+        return;
+      }
+
+      const encabezados = [
+        'RUT',
+        'RUT Formateado',
+        'Nombres Titular',
+        'Apellidos Titular',
+        'Nombre Comercial / Fantasía',
+        'Rubro Principal',
+        'Subrubro / Actividad',
+        'Formalización SII',
+        'Tramo RSH',
+        'Teléfono Contacto',
+        'Correo Electrónico',
+        'Comuna',
+        'Dirección Comercial / Taller',
+        'Instagram',
+        'Estado Expediente',
+        'Estado Padrón'
+      ];
+
+      const filas = padron.map(e => [
+        e.rut || '',
+        e.rut_formateado || e.rut || '',
+        e.nombres || '',
+        e.apellidos || '',
+        e.nombre_comercial || e.nombre_fantasia || '',
+        e.rubro || '',
+        e.subrubro || '',
+        e.formalizacion_sii || 'SIN_INICIO',
+        e.tramo_rsh ? `${e.tramo_rsh}%` : '',
+        e.telefono || '',
+        e.email || '',
+        e.comuna || 'Santiago',
+        e.direccion_completa || '',
+        e.red_instagram || '',
+        e.estado_expediente || 'COMPLETO',
+        e.estado || 'ACTIVO'
+      ]);
+
+      const nombreArchivo = `Padron_General_Emprendedores_Santiago_${new Date().toISOString().slice(0, 10)}.csv`;
+      descargarArchivoCSV(nombreArchivo, encabezados, filas);
+    } catch (err) {
+      mostrarToast('Error al exportar padrón general: ' + err.message, 'error');
+    }
+  };
+
+  // =========================================================
+  // SEGUIMIENTO E IMPACTO POST-MERCADO (GRILLA MASIVA EN TERRENO CON VENTAS POR DÍA)
+  // =========================================================
+  let listaParticipantesSeguimientoActual = [];
+  let jornadasSeguimientoActual = ['Día 1', 'Día 2'];
+  let iniciativaSeguimientoActual = null;
+
+  window.inicializarVistaSeguimientoMasivo = async function() {
+    const sel = document.getElementById('segIniciativaMasivo');
+    if (!sel) return;
+    try {
+      const res = await call('apiIniciativasListar', {});
+      const lista = (res && res.success && res.data) ? res.data : [];
+      if (lista.length === 0) {
+        sel.innerHTML = '<option value="">No hay ferias disponibles</option>';
+        return;
+      }
+      sel.innerHTML = lista.map(i => `<option value="${i.id_iniciativa}">${escapeHtml(i.nombre)} (${i.codigo || ''})</option>`).join('');
+      
+      if (sel.value) {
+        cargarParticipantesSeguimientoMasivo(sel.value);
+      }
+    } catch (e) {
+      sel.innerHTML = '<option value="">Error cargando iniciativas</option>';
+    }
+  };
+
+  window.cargarParticipantesSeguimientoMasivo = async function(idIniciativa) {
+    if (!idIniciativa) return;
+    const tbody = document.getElementById('tablaSeguimientoMasivoBody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="12" class="px-4 py-8 text-center text-slate-400">Cargando participantes y registros diarios de ventas...</td></tr>';
+    }
+
+    try {
+      const res = await call('apiListarParticipantesSeguimiento', idIniciativa);
+      if (!res || !res.success) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500">${res?.error || 'Error al consultar participantes'}</td></tr>`;
+        return;
+      }
+
+      iniciativaSeguimientoActual = res.data?.iniciativa || null;
+      listaParticipantesSeguimientoActual = res.data?.participantes || [];
+
+      // Si el servidor detectó jornadas previas en BD, sincronizarlas
+      if (res.data?.jornadas && Array.isArray(res.data.jornadas) && res.data.jornadas.length > 0) {
+        jornadasSeguimientoActual = res.data.jornadas;
+      } else if (!jornadasSeguimientoActual || jornadasSeguimientoActual.length === 0) {
+        jornadasSeguimientoActual = ['Día 1', 'Día 2'];
+      }
+
+      renderCabeceraSeguimiento();
+      renderPildorasJornadas();
+      renderTablaSeguimientoMasivo(listaParticipantesSeguimientoActual);
+      recalcularTotalesSeguimientoEnVivo();
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-rose-500">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  };
+
+  // Renderizar cabecera de la tabla con columnas dinámicas por día
+  function renderCabeceraSeguimiento() {
+    const tr = document.getElementById('tablaSeguimientoHeaderRow');
+    if (!tr) return;
+
+    let colsDias = jornadasSeguimientoActual.map(j => `
+      <th class="px-2.5 py-3 min-w-[110px] text-center bg-teal-50/90 font-bold text-teal-900 border-x border-teal-100">
+        ${escapeHtml(j)} ($)
+      </th>
+    `).join('');
+
+    tr.innerHTML = `
+      <th class="px-3 py-3 w-8 text-center">N°</th>
+      <th class="px-4 py-3 min-w-[180px]">Emprendimiento & RUT</th>
+      <th class="px-3 py-3 min-w-[120px]">Asistencia</th>
+      ${colsDias}
+      <th class="px-3 py-3 min-w-[130px] bg-teal-100 font-bold text-teal-950 text-right">Total Ventas ($)</th>
+      <th class="px-3 py-3 min-w-[105px] text-center">Seguidores Antes</th>
+      <th class="px-3 py-3 min-w-[105px] text-center">Seguidores Después</th>
+      <th class="px-3 py-3 min-w-[90px] text-center">Crecimiento (Δ)</th>
+      <th class="px-3 py-3 min-w-[120px]">Evaluación General</th>
+      <th class="px-3 py-3 min-w-[160px]">Observaciones / Incidencias</th>
+    `;
+  }
+
+  // Renderizar píldoras con los días activos de la feria
+  function renderPildorasJornadas() {
+    const cont = document.getElementById('contenedorPildorasJornadas');
+    if (!cont) return;
+
+    cont.innerHTML = jornadasSeguimientoActual.map((j, idx) => `
+      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-white text-slate-700 border border-slate-300 shadow-2xs">
+        <span>📅 ${escapeHtml(j)}</span>
+        ${jornadasSeguimientoActual.length > 1 && idx === jornadasSeguimientoActual.length - 1 ? `
+          <button type="button" onclick="quitarUltimaJornadaSeguimiento()" title="Quitar este día" class="text-slate-400 hover:text-rose-600 font-bold ml-1 text-xs">✕</button>
+        ` : ''}
+      </span>
+    `).join('');
+  }
+
+  // Agregar una jornada (día) a la feria
+  window.agregarJornadaSeguimiento = function() {
+    preservarEstadoInputsSeguimiento();
+    const proxNum = jornadasSeguimientoActual.length + 1;
+    const nuevoDia = `Día ${proxNum}`;
+    jornadasSeguimientoActual.push(nuevoDia);
+
+    renderCabeceraSeguimiento();
+    renderPildorasJornadas();
+    renderTablaSeguimientoMasivo(listaParticipantesSeguimientoActual);
+    recalcularTotalesSeguimientoEnVivo();
+    mostrarToast(`Se agregó ${nuevoDia} a la grilla de ventas.`, 'info');
+  };
+
+  // Quitar la última jornada
+  window.quitarUltimaJornadaSeguimiento = function() {
+    if (jornadasSeguimientoActual.length <= 1) {
+      mostrarToast('Debe registrar al menos un día de venta.', 'error');
+      return;
+    }
+    preservarEstadoInputsSeguimiento();
+    const eliminado = jornadasSeguimientoActual.pop();
+
+    renderCabeceraSeguimiento();
+    renderPildorasJornadas();
+    renderTablaSeguimientoMasivo(listaParticipantesSeguimientoActual);
+    recalcularTotalesSeguimientoEnVivo();
+    mostrarToast(`Se retiró ${eliminado}.`, 'info');
+  };
+
+  // Preservar en memoria los valores ingresados antes de redibujar columnas
+  function preservarEstadoInputsSeguimiento() {
+    const filas = document.querySelectorAll('#tablaSeguimientoMasivoBody tr[data-emprendimiento-id]');
+    filas.forEach(f => {
+      const idEmp = f.getAttribute('data-emprendimiento-id');
+      const item = listaParticipantesSeguimientoActual.find(p => p.id_emprendimiento === idEmp);
+      if (!item) return;
+
+      item.asistio = f.querySelector('.seg-input-asistio')?.value || 'SI';
+      item.ventas_diarias = item.ventas_diarias || {};
+
+      jornadasSeguimientoActual.forEach(j => {
+        const inputDia = f.querySelector(`.seg-input-dia[data-jornada="${j}"]`);
+        if (inputDia) {
+          item.ventas_diarias[j] = parseFloat(inputDia.value) || 0;
+        }
+      });
+
+      item.seguidores_antes = parseInt(f.querySelector('.seg-input-seg-antes')?.value, 10) || 0;
+      item.seguidores_despues = parseInt(f.querySelector('.seg-input-seg-despues')?.value, 10) || 0;
+      item.evaluacion_general = f.querySelector('.seg-input-eval')?.value || 'BUENA';
+      item.observaciones = f.querySelector('.seg-input-obs')?.value || '';
+    });
+  }
+
+  // Renderizar filas de la tabla masiva
+  function renderTablaSeguimientoMasivo(lista) {
+    const tbody = document.getElementById('tablaSeguimientoMasivoBody');
+    if (!tbody) return;
+
+    if (!lista || lista.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="12" class="px-4 py-8 text-center text-slate-400">
+            Esta iniciativa aún no tiene postulantes o titulares asignados.<br>
+            <button onclick="cambiarSeccion('seleccion')" class="mt-2 text-muni-600 font-bold underline hover:text-muni-800">
+              Ir a Selección y Asignar Participantes
+            </button>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = lista.map((p, idx) => {
+      const rut = p.rut || '—';
+      const nombreTitular = `${p.nombres || ''} ${p.apellidos || ''}`.trim() || 'Sin Nombre';
+      const negocio = p.nombre_comercial || 'Emprendimiento';
+      const segAntes = p.seguidores_antes != null ? p.seguidores_antes : 0;
+      const segDespues = p.seguidores_despues != null ? p.seguidores_despues : 0;
+      const deltaInicial = (segDespues - segAntes);
+      const asistio = p.asistio || 'SI';
+      const evaluacion = p.evaluacion_general || 'BUENA';
+      const obs = p.observaciones || '';
+      const vDiarias = p.ventas_diarias || {};
+
+      // Si no tiene ventas diarias pero sí ventas_totales_reportadas y hay 1 sola jornada, asignarla
+      let sumaFilasInicial = 0;
+      const inputsDiasHtml = jornadasSeguimientoActual.map((j, jIdx) => {
+        let valDia = vDiarias[j];
+        if (valDia === undefined) {
+          if (jIdx === 0 && (p.ventas_totales_reportadas || 0) > 0 && Object.keys(vDiarias).length === 0) {
+            valDia = p.ventas_totales_reportadas;
+          } else {
+            valDia = 0;
+          }
+        }
+        sumaFilasInicial += Number(valDia) || 0;
+
+        return `
+          <td class="px-2 py-2.5 text-center bg-teal-50/20 border-x border-slate-100">
+            <div class="relative">
+              <span class="absolute left-1.5 top-1.5 text-slate-400 font-semibold text-[10px]">$</span>
+              <input type="number" min="0" step="1000" value="${valDia || 0}" 
+                     data-jornada="${escapeHtml(j)}"
+                     class="seg-input-dia w-full text-xs pl-4 pr-1.5 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-slate-800 focus:ring-1 focus:ring-teal-500 text-right" 
+                     placeholder="0" oninput="recalcularTotalesSeguimientoEnVivo()">
+            </div>
+          </td>
+        `;
+      }).join('');
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100" data-emprendimiento-id="${p.id_emprendimiento}">
+          <td class="px-3 py-3 text-center font-bold text-slate-400">${idx + 1}</td>
+          <td class="px-4 py-3">
+            <div class="font-bold text-slate-800">${escapeHtml(negocio)}</div>
+            <div class="text-xs text-slate-600">${escapeHtml(nombreTitular)} · <span class="font-mono text-muni-600 font-semibold">${escapeHtml(rut)}</span></div>
+            <div class="text-[10px] text-slate-400">${escapeHtml(p.rubro || '')}</div>
+          </td>
+          <td class="px-3 py-3">
+            <select class="seg-input-asistio w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium focus:ring-1 focus:ring-teal-500" onchange="recalcularTotalesSeguimientoEnVivo()">
+              <option value="SI" ${asistio === 'SI' ? 'selected' : ''}>✅ Asistió</option>
+              <option value="NO" ${asistio === 'NO' ? 'selected' : ''}>❌ No asistió</option>
+              <option value="JUSTIFICADO" ${asistio === 'JUSTIFICADO' ? 'selected' : ''}>⚠️ Justificado</option>
+            </select>
+          </td>
+          ${inputsDiasHtml}
+          <td class="px-3 py-3 bg-teal-50/50 text-right">
+            <span class="seg-lbl-total-fila font-mono font-extrabold text-teal-900 text-xs">
+              $${Number(sumaFilasInicial).toLocaleString('es-CL')}
+            </span>
+          </td>
+          <td class="px-2 py-3">
+            <input type="number" min="0" value="${segAntes}" 
+                   class="seg-input-seg-antes w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-mono text-center focus:ring-1 focus:ring-teal-500" 
+                   placeholder="Antes" oninput="recalcularTotalesSeguimientoEnVivo()">
+          </td>
+          <td class="px-2 py-3">
+            <input type="number" min="0" value="${segDespues}" 
+                   class="seg-input-seg-despues w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg font-mono text-center focus:ring-1 focus:ring-teal-500" 
+                   placeholder="Después" oninput="recalcularTotalesSeguimientoEnVivo()">
+          </td>
+          <td class="px-2 py-3 text-center">
+            <span class="seg-lbl-delta inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold ${deltaInicial >= 0 ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
+              ${deltaInicial >= 0 ? '+' + deltaInicial : deltaInicial}
+            </span>
+          </td>
+          <td class="px-3 py-3">
+            <select class="seg-input-eval w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg bg-white font-medium focus:ring-1 focus:ring-teal-500">
+              <option value="EXCELENTE" ${evaluacion === 'EXCELENTE' ? 'selected' : ''}>⭐ Excelente</option>
+              <option value="BUENA" ${evaluacion === 'BUENA' ? 'selected' : ''}>👍 Buena</option>
+              <option value="REGULAR" ${evaluacion === 'REGULAR' ? 'selected' : ''}>⚠️ Regular</option>
+              <option value="DEFICIENTE" ${evaluacion === 'DEFICIENTE' ? 'selected' : ''}>👎 Deficiente</option>
+            </select>
+          </td>
+          <td class="px-3 py-3">
+            <input type="text" value="${escapeHtml(obs)}" 
+                   class="seg-input-obs w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-teal-500" 
+                   placeholder="Notas del puesto o incidencias...">
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Recalcular en tiempo real ventas por día, total acumulado, comparativa y seguidores
+  window.recalcularTotalesSeguimientoEnVivo = function() {
+    const filas = document.querySelectorAll('#tablaSeguimientoMasivoBody tr[data-emprendimiento-id]');
+    let totalVentasGeneral = 0;
+    let totalDeltaSeguidores = 0;
+    let asistieronCount = 0;
+    const totalParticipantes = filas.length;
+
+    // Mapa de ventas acumuladas por día: { 'Día 1': 0, 'Día 2': 0, ... }
+    const acumuladoPorDia = {};
+    jornadasSeguimientoActual.forEach(j => {
+      acumuladoPorDia[j] = 0;
+    });
+
+    filas.forEach(f => {
+      const asistio = f.querySelector('.seg-input-asistio')?.value;
+      if (asistio === 'SI') asistieronCount++;
+
+      // Sumar días para este emprendedor
+      let sumaEmprendedor = 0;
+      jornadasSeguimientoActual.forEach(j => {
+        const inputDia = f.querySelector(`.seg-input-dia[data-jornada="${j}"]`);
+        const montoDia = parseFloat(inputDia?.value) || 0;
+        sumaEmprendedor += montoDia;
+        acumuladoPorDia[j] += montoDia;
+      });
+
+      // Actualizar celda de Total Ventas de la fila
+      const lblTotalFila = f.querySelector('.seg-lbl-total-fila');
+      if (lblTotalFila) {
+        lblTotalFila.textContent = '$' + Number(sumaEmprendedor).toLocaleString('es-CL');
+      }
+      totalVentasGeneral += sumaEmprendedor;
+
+      // Calcular seguidores
+      const segAntes = parseInt(f.querySelector('.seg-input-seg-antes')?.value, 10) || 0;
+      const segDespues = parseInt(f.querySelector('.seg-input-seg-despues')?.value, 10) || 0;
+      const delta = segDespues - segAntes;
+      totalDeltaSeguidores += delta;
+
+      const lblDelta = f.querySelector('.seg-lbl-delta');
+      if (lblDelta) {
+        lblDelta.textContent = delta >= 0 ? `+${delta}` : String(delta);
+        if (delta >= 0) {
+          lblDelta.className = 'seg-lbl-delta inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200';
+        } else {
+          lblDelta.className = 'seg-lbl-delta inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200';
+        }
+      }
+    });
+
+    // Formatear montos generales
+    const fmVentas = '$' + Number(totalVentasGeneral).toLocaleString('es-CL');
+    const fmSeguidores = (totalDeltaSeguidores >= 0 ? '+' : '') + Number(totalDeltaSeguidores).toLocaleString('es-CL');
+
+    // Badges superiores
+    const bPart = document.getElementById('segTotalParticipantesBadge');
+    const bAsis = document.getElementById('segTotalAsistieronBadge');
+    const bVent = document.getElementById('segTotalVentasBadge');
+    const bSeg = document.getElementById('segTotalSeguidoresBadge');
+    const lblSumaV = document.getElementById('lblSumaVentasEnVivo');
+    const lblSumaSeg = document.getElementById('lblSumaSeguidoresEnVivo');
+    const lblDesgloseDias = document.getElementById('lblDesgloseDiasEnVivo');
+
+    if (bPart) bPart.textContent = totalParticipantes;
+    if (bAsis) bAsis.textContent = asistieronCount;
+    if (bVent) bVent.textContent = fmVentas;
+    if (bSeg) bSeg.textContent = fmSeguidores;
+    if (lblSumaV) lblSumaV.textContent = fmVentas;
+    if (lblSumaSeg) lblSumaSeg.textContent = fmSeguidores;
+
+    // Desglose compacto en el pie de tabla
+    if (lblDesgloseDias) {
+      const fragmentos = Object.entries(acumuladoPorDia).map(([dia, m]) => `${dia}: $${Number(m).toLocaleString('es-CL')}`);
+      lblDesgloseDias.textContent = fragmentos.join(' · ');
+    }
+
+    // Actualizar Panel Analítico Comparativo de Ventas Diarias
+    actualizarPanelAnalisisVentasDiarias(acumuladoPorDia, totalVentasGeneral, asistieronCount || totalParticipantes);
+  };
+
+  // Actualizar métricas comparativas del panel analítico
+  function actualizarPanelAnalisisVentasDiarias(acumuladoPorDia, totalVentas, cantParticipantesEfectivos) {
+    const entries = Object.entries(acumuladoPorDia);
+    if (entries.length === 0) return;
+
+    let diaMayor = entries[0];
+    let diaMenor = entries[0];
+
+    for (let i = 1; i < entries.length; i++) {
+      if (entries[i][1] > diaMayor[1]) {
+        diaMayor = entries[i];
+      }
+      if (entries[i][1] < diaMenor[1]) {
+        diaMenor = entries[i];
+      }
+    }
+
+    // Actualizar Tarjeta Día Mayor Venta
+    const badgeMayor = document.getElementById('badgeDiaMayorVenta');
+    const montoMayor = document.getElementById('montoDiaMayorVenta');
+    if (badgeMayor && montoMayor) {
+      if (totalVentas > 0) {
+        badgeMayor.textContent = `${diaMayor[0]}`;
+        const pctMayor = Math.round((diaMayor[1] / totalVentas) * 100);
+        montoMayor.textContent = `$${Number(diaMayor[1]).toLocaleString('es-CL')} (${pctMayor}% de la feria)`;
+      } else {
+        badgeMayor.textContent = 'Sin ventas registradas';
+        montoMayor.textContent = '$0';
+      }
+    }
+
+    // Actualizar Tarjeta Día Menor Venta
+    const badgeMenor = document.getElementById('badgeDiaMenorVenta');
+    const montoMenor = document.getElementById('montoDiaMenorVenta');
+    if (badgeMenor && montoMenor) {
+      if (totalVentas > 0) {
+        badgeMenor.textContent = `${diaMenor[0]}`;
+        const pctMenor = Math.round((diaMenor[1] / totalVentas) * 100);
+        montoMenor.textContent = `$${Number(diaMenor[1]).toLocaleString('es-CL')} (${pctMenor}% de la feria)`;
+      } else {
+        badgeMenor.textContent = 'Sin ventas registradas';
+        montoMenor.textContent = '$0';
+      }
+    }
+
+    // Actualizar Promedio por Emprendimiento
+    const badgePromedio = document.getElementById('badgePromedioVentasEmp');
+    const subPromedio = document.getElementById('badgeSubtextoPromedio');
+    if (badgePromedio) {
+      const promedio = cantParticipantesEfectivos > 0 ? Math.round(totalVentas / cantParticipantesEfectivos) : 0;
+      badgePromedio.textContent = `$${Number(promedio).toLocaleString('es-CL')}`;
+      if (subPromedio) {
+        subPromedio.textContent = `En base a ${cantParticipantesEfectivos} emprendimientos`;
+      }
+    }
+
+    // Renderizar barras comparativas de distribución
+    const contenedorBarras = document.getElementById('contenedorBarrasDistribucionDias');
+    if (contenedorBarras) {
+      contenedorBarras.innerHTML = entries.map(([dia, monto]) => {
+        const pct = totalVentas > 0 ? Math.round((monto / totalVentas) * 100) : 0;
+        const esMayor = totalVentas > 0 && dia === diaMayor[0];
+        const esMenor = totalVentas > 0 && dia === diaMenor[0] && entries.length > 1;
+
+        let badgeIndicador = '';
+        if (esMayor) {
+          badgeIndicador = '<span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 ml-2">🏆 Más Ventas</span>';
+        } else if (esMenor) {
+          badgeIndicador = '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 ml-2">Menos Ventas</span>';
+        }
+
+        return `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs">
+              <div class="font-bold text-slate-700 flex items-center">
+                <span>${escapeHtml(dia)}</span>
+                ${badgeIndicador}
+              </div>
+              <div class="font-mono font-bold text-slate-800">
+                $${Number(monto).toLocaleString('es-CL')} <span class="text-slate-400 font-normal">(${pct}%)</span>
+              </div>
+            </div>
+            <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+              <div class="h-full rounded-full transition-all duration-300 ${esMayor ? 'bg-emerald-500' : 'bg-teal-500'}" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // Guardar en Turso el seguimiento masivo con el desglose por día
+  window.guardarSeguimientoMasivoEnTerreno = async function() {
+    const idIniciativa = document.getElementById('segIniciativaMasivo')?.value;
+    if (!idIniciativa) {
+      mostrarToast('Seleccione una iniciativa a evaluar.', 'error');
+      return;
+    }
+
+    const filasEls = document.querySelectorAll('#tablaSeguimientoMasivoBody tr[data-emprendimiento-id]');
+    if (filasEls.length === 0) {
+      mostrarToast('No hay participantes en la grilla para guardar.', 'error');
+      return;
+    }
+
+    const payloadFilas = [];
+
+    filasEls.forEach(f => {
+      const idEmp = f.getAttribute('data-emprendimiento-id');
+      const asistio = f.querySelector('.seg-input-asistio')?.value || 'SI';
+
+      // Recopilar ventas por cada día
+      const ventasDiarias = {};
+      let ventasTotales = 0;
+      jornadasSeguimientoActual.forEach(j => {
+        const inputDia = f.querySelector(`.seg-input-dia[data-jornada="${j}"]`);
+        const val = parseFloat(inputDia?.value) || 0;
+        ventasDiarias[j] = val;
+        ventasTotales += val;
+      });
+
+      const segAntes = parseInt(f.querySelector('.seg-input-seg-antes')?.value, 10) || 0;
+      const segDespues = parseInt(f.querySelector('.seg-input-seg-despues')?.value, 10) || 0;
+      const deltaSeg = segDespues - segAntes;
+      const evaluacion = f.querySelector('.seg-input-eval')?.value || 'BUENA';
+      const obs = f.querySelector('.seg-input-obs')?.value || '';
+
+      if (idEmp) {
+        payloadFilas.push({
+          idEmprendimiento: idEmp,
+          asistio: asistio,
+          ventasDiarias: ventasDiarias,
+          ventasTotalesReportadas: ventasTotales,
+          seguidoresAntes: segAntes,
+          seguidoresDespues: segDespues,
+          seguidoresGanados: deltaSeg,
+          evaluacionGeneral: evaluacion,
+          observaciones: obs
+        });
+      }
+    });
+
+    try {
+      mostrarToast('Guardando seguimiento y desglose por día en Turso...', 'info');
+      const res = await call('apiGuardarSeguimientoMasivo', {
+        idIniciativa: idIniciativa,
+        jornadas: jornadasSeguimientoActual,
+        filas: payloadFilas
+      });
+
+      if (res && res.success) {
+        mostrarToast(`✓ Se guardó exitosamente el seguimiento con ventas por día de ${payloadFilas.length} participantes en Turso.`, 'success');
+        actualizarDashboardCompleto();
+        // Recargar para sincronizar cálculos y estado oficial
+        cargarParticipantesSeguimientoMasivo(idIniciativa);
+      } else {
+        mostrarToast(res?.error || 'Error al guardar seguimiento masivo', 'error');
+      }
+    } catch (err) {
+      mostrarToast(err.message, 'error');
+    }
+  };
+
+  // =========================================================
+  // MODAL EXPEDIENTE DIGITAL Y REVISIÓN DE CALIDAD
+  // =========================================================
+  window.abrirModalDocumentosEmprendedor = async function(idEmprendedor, nombreNegocio, nombreTitular, rut, rubro) {
+    const modal = document.getElementById('modalExpedienteDocumentos');
+    if (!modal) return;
+
+    const elNom = document.getElementById('docModalNombreEmprendimiento');
+    if (elNom) elNom.textContent = nombreNegocio || 'Emprendimiento';
+    const elTit = document.getElementById('docModalTitularRut');
+    if (elTit) elTit.textContent = `${nombreTitular || ''} · ${rut || ''}`;
+    const elRub = document.getElementById('docModalRubroBadge');
+    if (elRub) elRub.textContent = rubro || 'Rubro General';
+    
+    // Reseteo diagnósticos
+    const elFotoBadge = document.getElementById('diagFotoBadge');
+    if (elFotoBadge) {
+      elFotoBadge.textContent = 'Consultando...';
+      elFotoBadge.className = 'font-bold text-amber-600';
+    }
+    const elSiiBadge = document.getElementById('diagSiiBadge');
+    if (elSiiBadge) elSiiBadge.textContent = 'Consultando...';
+    const elSanBadge = document.getElementById('diagSanitariaBadge');
+    if (elSanBadge) elSanBadge.textContent = 'Consultando...';
+    const elRshBadge = document.getElementById('diagRshBadge');
+    if (elRshBadge) elRshBadge.textContent = 'Consultando...';
+    
+    const listaContainer = document.getElementById('listaDocsExpediente');
+    if (listaContainer) {
+      listaContainer.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Cargando expediente digital desde Google Drive y Turso...</div>';
+    }
+    const elConteo = document.getElementById('docConteoTotal');
+    if (elConteo) elConteo.textContent = '0 documentos';
+
+    modal.classList.remove('hidden');
+
+    try {
+      const res = await call('apiListarDocumentosEmprendedor', idEmprendedor);
+      const docs = (res && res.success && res.data) ? res.data : [];
+      if (elConteo) elConteo.textContent = `${docs.length} documento${docs.length === 1 ? '' : 's'}`;
+
+      let tieneFotos = false;
+      let tieneSii = false;
+      let tieneSanitaria = false;
+      let tieneRsh = false;
+
+      docs.forEach(d => {
+        const tipo = (d.tipo_documento || '').toUpperCase();
+        if (tipo.includes('FOTO') || tipo.includes('CATALOGO') || tipo.includes('PRODUCTO')) tieneFotos = true;
+        if (tipo.includes('INICIO') || tipo.includes('SII') || tipo.includes('ACTIVIDAD')) tieneSii = true;
+        if (tipo.includes('SANITARIA') || tipo.includes('SEREMI')) tieneSanitaria = true;
+        if (tipo.includes('HOGARES') || tipo.includes('RSH') || tipo.includes('REGISTRO_SOCIAL')) tieneRsh = true;
+      });
+
+      // Indicadores
+      const elFoto = document.getElementById('diagFotoBadge');
+      if (elFoto) {
+        if (tieneFotos) {
+          elFoto.textContent = '✓ Fotos Registradas';
+          elFoto.className = 'font-bold text-emerald-700';
+        } else {
+          elFoto.textContent = '⚠️ Sin fotos de muestras';
+          elFoto.className = 'font-bold text-amber-700';
+        }
+      }
+
+      const elSii = document.getElementById('diagSiiBadge');
+      if (elSii) {
+        if (tieneSii) {
+          elSii.textContent = '✓ Inicio SII Válido';
+          elSii.className = 'font-bold text-emerald-700';
+        } else {
+          elSii.textContent = 'Pendiente / Informal';
+          elSii.className = 'font-bold text-slate-500';
+        }
+      }
+
+      const elSan = document.getElementById('diagSanitariaBadge');
+      if (elSan) {
+        const esRubroAlimento = (rubro || '').toUpperCase().includes('ALIMENT') || (rubro || '').toUpperCase().includes('GASTRONOM') || (rubro || '').toUpperCase().includes('COSMET');
+        if (tieneSanitaria) {
+          elSan.textContent = '✓ Res. Sanitaria OK';
+          elSan.className = 'font-bold text-emerald-700';
+        } else if (esRubroAlimento) {
+          elSan.textContent = '⚠️ Res. Exigible';
+          elSan.className = 'font-bold text-rose-700';
+        } else {
+          elSan.textContent = 'No exigible';
+          elSan.className = 'font-bold text-slate-400';
+        }
+      }
+
+      const elRsh = document.getElementById('diagRshBadge');
+      if (elRsh) {
+        if (tieneRsh) {
+          elRsh.textContent = '✓ Cartola RSH';
+          elRsh.className = 'font-bold text-emerald-700';
+        } else {
+          elRsh.textContent = 'Sin cartola';
+          elRsh.className = 'font-bold text-slate-400';
+        }
+      }
+
+      if (docs.length === 0) {
+        if (listaContainer) {
+          listaContainer.innerHTML = `
+            <div class="p-8 text-center text-slate-400 text-xs space-y-2">
+              <div class="text-2xl">📄</div>
+              <p>Este emprendedor aún no registra documentos cargados en su carpeta de Google Drive.</p>
+              <p class="text-[11px] text-slate-400">Puede solicitarle los archivos o cargarlos directamente desde la pestaña "Expediente".</p>
+            </div>
+          `;
+        }
+        return;
+      }
+
+      if (listaContainer) {
+        listaContainer.innerHTML = docs.map(d => {
+          const esFoto = (d.mime_type || '').startsWith('image/') || (d.tipo_documento || '').includes('FOTO');
+          const icono = esFoto ? '🖼️' : '📄';
+          const urlDrive = d.drive_url || '#';
+          const fecha = d.creado_en ? String(d.creado_en).substring(0, 10) : 'Fecha s/r';
+          const tipoLegible = (d.tipo_documento || 'DOCUMENTO').replace(/_/g, ' ');
+
+          return `
+            <div class="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition text-xs">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="text-lg">${icono}</span>
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-800 truncate">${escapeHtml(d.nombre_archivo || tipoLegible)}</div>
+                  <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                    <span class="font-semibold text-muni-700">${escapeHtml(tipoLegible)}</span>
+                    <span>·</span>
+                    <span>${escapeHtml(fecha)}</span>
+                    <span>·</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">
+                      ${escapeHtml(d.estado_revision || 'VIGENTE')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                ${d.drive_url ? `
+                  <a href="${d.drive_url}" target="_blank" rel="noopener noreferrer" 
+                     class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition flex items-center gap-1">
+                    <span>Abrir en Drive</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                  </a>
+                ` : `
+                  <span class="text-[11px] text-slate-400 italic">Registrado en Turso</span>
+                `}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch (e) {
+      if (listaContainer) {
+        listaContainer.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs">Error consultando documentos: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+  };
+
+  window.cerrarModalDocumentos = function() {
+    const modal = document.getElementById('modalExpedienteDocumentos');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  // Inicializar vista principal por defecto
+  setTimeout(() => {
+    actualizarDashboardCompleto();
+  }, 300);
+
+  // Inicializar compatibilidad si aplica
+  try {
+    init();
+  } catch (errInit) {
+    console.warn('Init skip:', errInit);
+  }
 </script>
