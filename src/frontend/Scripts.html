@@ -2564,9 +2564,23 @@
           <div class="panel-head">
             <div>
               <h2>⚖️ Selección simplificada de postulaciones</h2>
-              <p class="muted">Priorice, filtre y seleccione postulantes de manera ágil y transparente.</p>
+              <p class="muted">Asistente de pre-filtro y selección balanceada por rubro, rotación y mérito.</p>
             </div>
           </div>
+
+          <div id="v2PrefilterBox" class="prefilter-card" style="display:none;">
+            <div class="prefilter-header">
+              <div class="prefilter-title">
+                <span>🎯 Asistente de Pre-Filtro y Cuotas por Rubro</span>
+              </div>
+              <div id="v2PrefilterStats" class="prefilter-stats"></div>
+            </div>
+            <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">
+              Haga clic en un rubro para filtrar la tabla o presione <strong>"Pre-selección inteligente"</strong> para balancear cupos automáticamente:
+            </div>
+            <div id="v2RubroChips" class="prefilter-chips"></div>
+          </div>
+
           <div class="filters">
             <select id="v2Market" style="min-width:280px">
               ${ms.map(function(i) { return `<option value="${escapeHtml(i.ID_INICIATIVA)}" data-tit="${i.CUPOS_TITULARES || 0}" data-sup="${i.CUPOS_SUPLENTES || 0}">${escapeHtml(i.NOMBRE)} · ${escapeHtml(dateValue(i.FECHA_EJECUCION) || 'sin fecha')}</option>`; }).join('')}
@@ -2594,6 +2608,7 @@
               <span>0 postulaciones marcadas (0 titulares, 0 suplentes)</span>
             </div>
             <div class="selection-actions">
+              <button class="btn btn-primary btn-small" id="v2SmartPreselect" title="Calcula una distribución balanceada de cupos respetando diversidad de rubros y rotación justa (1ª vez)">⚡ Pre-selección inteligente (Rubros + Rotación)</button>
               <button class="btn btn-secondary btn-small" id="v2SelectTopTit">⚡ Auto-marcar primeros N titulares</button>
               <button class="btn btn-secondary btn-small" id="v2SelectAll">☑️ Marcar todos</button>
               <button class="btn btn-link btn-small" id="v2ClearSelection">Limpiar selección</button>
@@ -2648,6 +2663,55 @@
       $('#v2Save').onclick = saveSelectionV2;
       $('#v2Confirm').onclick = function() { renderConfirmaciones($('#v2Market').value); };
 
+      $('#v2SmartPreselect').onclick = async function() {
+        const b = $('#v2SmartPreselect');
+        const mId = $('#v2Market').value;
+        const tit = Math.max(0, Number($('#v2Tit').value || 0));
+        const sup = Math.max(0, Number($('#v2Sup').value || 0));
+        if (!tit && !sup) return alertMsg('Indique al menos 1 cupo titular o suplente.', 'warn');
+        try {
+          b.disabled = true;
+          b.textContent = 'Calculando pre-selección inteligente…';
+          const r = assertOk(await call('apiDiagnosticoYPreseleccionMercado', mId, {
+            calcularSugerencia: true,
+            cuposTitulares: tit,
+            cuposSuplentes: sup,
+            soloHabilitados: true
+          }));
+          if (r && r.sugerencia) {
+            const allSugg = [].concat(r.sugerencia.titularesIds || [], r.sugerencia.suplentesIds || []);
+            const checks = Array.from(document.querySelectorAll('.v2Check'));
+            checks.forEach(function(c) {
+              c.checked = allSugg.indexOf(c.value) >= 0;
+            });
+            // Decorar filas con badges de motivo de pre-filtro
+            document.querySelectorAll('.v2-sugg-badge').forEach(function(el) { el.remove(); });
+            Object.keys(r.sugerencia.motivos || {}).forEach(function(pId) {
+              const chk = document.querySelector(`.v2Check[value="${pId}"]`);
+              if (chk) {
+                const tr = chk.closest('tr');
+                if (tr) {
+                  const tdEmp = tr.querySelectorAll('td')[1];
+                  if (tdEmp) {
+                    const badge = document.createElement('div');
+                    badge.className = 'v2-sugg-badge badge-suggested';
+                    badge.textContent = '⭐ Sugerido: ' + r.sugerencia.motivos[pId];
+                    tdEmp.appendChild(badge);
+                  }
+                }
+              }
+            });
+            updateCounter();
+            alertMsg(`✨ Pre-selección inteligente aplicada: ${allSugg.length} emprendedores pre-marcados respetando diversidad de rubro y rotación.`);
+          }
+        } catch (e) {
+          alertMsg(e.message, 'error');
+        } finally {
+          b.disabled = false;
+          b.textContent = '⚡ Pre-selección inteligente (Rubros + Rotación)';
+        }
+      };
+
       $('#v2SelectTopTit').onclick = function() {
         const tit = Math.max(0, Number($('#v2Tit').value || 0));
         const checks = Array.from(document.querySelectorAll('.v2Check'));
@@ -2662,6 +2726,7 @@
 
       $('#v2ClearSelection').onclick = function() {
         document.querySelectorAll('.v2Check').forEach(function(c) { c.checked = false; });
+        document.querySelectorAll('.v2-sugg-badge').forEach(function(el) { el.remove(); });
         updateCounter();
       };
 
@@ -2674,13 +2739,45 @@
   async function loadSelectionV2(onUpdate) {
     const t = $('#v2Rows'), id = $('#v2Market').value;
     try {
-      const rows = assertOk(await call('apiCandidatosPostulacionesMercado', id, {
-        q: $('#v2Q').value,
-        RUBRO: $('#v2Rubro').value,
-        FORMALIZACION: $('#v2Formal').value,
-        orden: $('#v2Sort').value
-      }));
-      t.innerHTML = rows.length ? `
+      // Cargar candidatos y diagnóstico en paralelo
+      const [rows, diagRes] = await Promise.all([
+        call('apiCandidatosPostulacionesMercado', id, {
+          q: $('#v2Q').value,
+          RUBRO: $('#v2Rubro').value,
+          FORMALIZACION: $('#v2Formal').value,
+          orden: $('#v2Sort').value
+        }),
+        call('apiDiagnosticoYPreseleccionMercado', id, {})
+      ]);
+
+      const candidatos = assertOk(rows);
+      const diag = (diagRes && diagRes.ok) ? diagRes.data : null;
+
+      // Renderizar Diagnóstico de Rubros en el asistente
+      if (diag && $('#v2PrefilterBox')) {
+        $('#v2PrefilterBox').style.display = 'block';
+        $('#v2PrefilterStats').innerHTML = `
+          <span class="prefilter-stat-badge">📋 Total postulantes: <strong>${diag.totalPostulaciones}</strong></span>
+          <span class="prefilter-stat-badge">✅ Habilitados: <strong>${diag.totalHabilitados}</strong></span>
+          <span class="prefilter-stat-badge">⭐ 1ª postulación (Rotación): <strong>${diag.totalPrimeraVez}</strong></span>
+        `;
+        const activeRubro = $('#v2Rubro').value || '';
+        const chipsHtml = [`<span class="chip-rubro ${activeRubro === '' ? 'active' : ''}" data-chip-rubro="">Todos (${diag.totalPostulaciones})</span>`];
+        Object.keys(diag.resumenRubros || {}).forEach(function(rk) {
+          const rInfo = diag.resumenRubros[rk];
+          const isAct = activeRubro === rk;
+          chipsHtml.push(`<span class="chip-rubro ${isAct ? 'active' : ''}" data-chip-rubro="${escapeHtml(rk)}">${escapeHtml(labelCodeText(rk))} <span class="chip-count">${rInfo.total}</span></span>`);
+        });
+        $('#v2RubroChips').innerHTML = chipsHtml.join('');
+        $('#v2RubroChips').querySelectorAll('.chip-rubro').forEach(function(chip) {
+          chip.onclick = function() {
+            $('#v2Rubro').value = chip.dataset.chipRubro || '';
+            loadSelectionV2(onUpdate);
+          };
+        });
+      }
+
+      t.innerHTML = candidatos.length ? `
         <div class="table-wrap">
           <table>
             <thead>
@@ -2696,7 +2793,7 @@
               </tr>
             </thead>
             <tbody>
-              ${rows.map(function(r) {
+              ${candidatos.map(function(r) {
                 const badgeHist = r.PARTICIPACIONES_PREVIAS === 0
                   ? '<span class="badge-priority">⭐ 1ª postulación (Prioritario)</span>'
                   : `<span class="badge-history">🔄 ${r.PARTICIPACIONES_PREVIAS} ferias previas</span>`;

@@ -213,6 +213,141 @@ function apiCandidatosPostulacionesMercado(idIniciativa, filtros) {
   }
 }
 
+/**
+ * Diagnóstico estadístico y asistente de pre-filtro inteligente para mercados.
+ * Agrupa postulaciones por rubro, historial y habilitación, y genera sugerencia balanceada.
+ */
+function apiDiagnosticoYPreseleccionMercado(idIniciativa, config) {
+  try {
+    exigirPermiso_('SELECCION_EJECUTAR');
+    config = config || {};
+    const res = apiCandidatosPostulacionesMercado(idIniciativa, {});
+    if (!res.ok) return res;
+    const candidatos = res.data || [];
+
+    const resumenRubros = {};
+    let totalHabilitados = 0;
+    let totalPrimeraVez = 0;
+
+    candidatos.forEach(function(c) {
+      const rubro = c.RUBRO || 'SIN_RUBRO';
+      if (!resumenRubros[rubro]) {
+        resumenRubros[rubro] = {
+          codigo: rubro,
+          total: 0,
+          habilitados: 0,
+          primeraVez: 0
+        };
+      }
+      resumenRubros[rubro].total++;
+      if (c.HABILITADO_MERCADO === 'SI') {
+        resumenRubros[rubro].habilitados++;
+        totalHabilitados++;
+      }
+      if (Number(c.PARTICIPACIONES_PREVIAS || 0) === 0) {
+        resumenRubros[rubro].primeraVez++;
+        totalPrimeraVez++;
+      }
+    });
+
+    let sugerencia = null;
+    if (config.calcularSugerencia) {
+      const titulares = Math.max(0, Number(config.cuposTitulares || 0));
+      const suplentes = Math.max(0, Number(config.cuposSuplentes || 0));
+      const totalCupos = titulares + suplentes;
+      const soloHabilitados = config.soloHabilitados !== false;
+
+      let universo = candidatos.slice();
+      if (soloHabilitados && totalHabilitados > 0) {
+        universo = universo.filter(function(c) { return c.HABILITADO_MERCADO === 'SI'; });
+      }
+
+      // Agrupar por rubro
+      const grupos = {};
+      universo.forEach(function(c) {
+        const r = c.RUBRO || 'SIN_RUBRO';
+        (grupos[r] = grupos[r] || []).push(c);
+      });
+
+      // Ordenar dentro de cada rubro: menor participaciones previas, luego alfabético
+      Object.keys(grupos).forEach(function(r) {
+        grupos[r].sort(function(a, b) {
+          const pA = Number(a.PARTICIPACIONES_PREVIAS || 0);
+          const pB = Number(b.PARTICIPACIONES_PREVIAS || 0);
+          if (pA !== pB) return pA - pB;
+          return String(a.NOMBRE_EMPRENDIMIENTO).localeCompare(String(b.NOMBRE_EMPRENDIMIENTO));
+        });
+      });
+
+      const seleccionados = [];
+      const rubrosKeys = Object.keys(grupos).sort();
+      const cuotas = config.cuotasPorRubro || {};
+      const tieneCuotasFijas = Object.keys(cuotas).length > 0;
+
+      if (tieneCuotasFijas) {
+        rubrosKeys.forEach(function(r) {
+          const cupo = Number(cuotas[r] || 0);
+          const disponibles = grupos[r] || [];
+          for (let i = 0; i < cupo && i < disponibles.length; i++) {
+            disponibles[i].MOTIVO_SUGERENCIA = 'Cupo reservado rubro ' + r + (disponibles[i].PARTICIPACIONES_PREVIAS === 0 ? ' (1ª vez)' : '');
+            seleccionados.push(disponibles[i]);
+          }
+        });
+      } else {
+        // Modo Equidad Automática: repartir equitativamente entre los rubros disponibles
+        let quedan = true;
+        let index = 0;
+        while (quedan && seleccionados.length < totalCupos && seleccionados.length < universo.length) {
+          quedan = false;
+          rubrosKeys.forEach(function(r) {
+            const list = grupos[r];
+            if (index < list.length && seleccionados.length < totalCupos) {
+              list[index].MOTIVO_SUGERENCIA = 'Equidad de rubro ' + r + (list[index].PARTICIPACIONES_PREVIAS === 0 ? ' (1ª vez prioritaria)' : '');
+              seleccionados.push(list[index]);
+              quedan = true;
+            }
+          });
+          index++;
+        }
+      }
+
+      // Si aún faltan cupos por llenar, completar con los restantes por menor participación
+      if (seleccionados.length < totalCupos) {
+        const selIds = seleccionados.map(function(s) { return s.ID_POSTULACION; });
+        const restantes = universo.filter(function(c) { return selIds.indexOf(c.ID_POSTULACION) < 0; });
+        restantes.sort(function(a, b) {
+          return Number(a.PARTICIPACIONES_PREVIAS || 0) - Number(b.PARTICIPACIONES_PREVIAS || 0);
+        });
+        restantes.forEach(function(c) {
+          if (seleccionados.length < totalCupos) {
+            c.MOTIVO_SUGERENCIA = 'Cupo complementario por menor participación histórica';
+            seleccionados.push(c);
+          }
+        });
+      }
+
+      sugerencia = {
+        titularesIds: seleccionados.slice(0, titulares).map(function(x) { return x.ID_POSTULACION; }),
+        suplentesIds: seleccionados.slice(titulares, titulares + suplentes).map(function(x) { return x.ID_POSTULACION; }),
+        motivos: seleccionados.reduce(function(acc, x) {
+          acc[x.ID_POSTULACION] = x.MOTIVO_SUGERENCIA;
+          return acc;
+        }, {})
+      };
+    }
+
+    return respuestaOk({
+      totalPostulaciones: candidatos.length,
+      totalHabilitados: totalHabilitados,
+      totalPrimeraVez: totalPrimeraVez,
+      resumenRubros: resumenRubros,
+      sugerencia: sugerencia
+    });
+  } catch (error) {
+    return manejarError_(error, 'apiDiagnosticoYPreseleccionMercado');
+  }
+}
+
 function copiarExpedienteSeleccionadoMercado_(iniciativa, postulacion) {
   try {
     const mapas = mapasPostulaciones_();
@@ -256,6 +391,10 @@ function apiRegistrarSeleccionManualPostulaciones(idIniciativa, idsPostulacion, 
       return String(p.ID_INICIATIVA) === String(idIniciativa) && idsPostulacion.indexOf(p.ID_POSTULACION) >= 0;
     });
     exigir_(posts.length === idsPostulacion.length, 'POSTULACION_INVALIDA', 'Todas las postulaciones deben pertenecer al mercado.');
+    // Ordenar posts en el orden exacto especificado en idsPostulacion
+    posts.sort(function(a, b) {
+      return idsPostulacion.indexOf(a.ID_POSTULACION) - idsPostulacion.indexOf(b.ID_POSTULACION);
+    });
     // Se otorga flexibilidad al funcionario: no se bloquea por habilitación documental
     return conBloqueoSistema_(function() {
       const procesoId = uuid_();
