@@ -1,5 +1,5 @@
-# Ignorar archivos consolidados generados localmente
-Code.gs
-Index.html
+# Ignorar archivos consolidados generados localmente SOLO en la raíz
+/Code.gs
+/Index.html
 .DS_Store
 *.log

@@ -1,6 +1,6 @@
 # Ignorar archivos no relacionados en clasp
 **/*.md
-Code.gs
-Index.html
+/Code.gs
+/Index.html
 .gitignore
 .git/**

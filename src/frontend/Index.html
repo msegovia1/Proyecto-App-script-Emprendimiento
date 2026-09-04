@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= appName ?> · Municipalidad de Santiago</title>
+  <meta name="description" content="Plataforma de gestión de emprendedores, expedientes en Google Drive y base de datos relacional Turso (libSQL)">
+  <meta property="og:title" content="<?= appName ?>">
+  <meta property="og:description" content="Sistema de Gestión de Emprendimientos - Municipalidad de Santiago">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            muni: {
+              950: '#001a2c',
+              900: '#002b49', // Azul Marino Municipalidad de Santiago
+              800: '#003e69',
+              700: '#005a9c', // Azul Institucional Santiago
+              600: '#0277bd',
+              500: '#0288d1',
+              400: '#38bdf8',
+              50: '#f0f7fc'
+            },
+            oro: {
+              400: '#d4af37',
+              500: '#c59b27', // Dorado Heráldico Santiago
+              600: '#a37f1e',
+              50: '#fcf9ee'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+    .stgo-gradient { background: linear-gradient(135deg, #002b49 0%, #005a9c 100%); }
+  </style>
+  <?!= include_('Styles') ?>
+</head>
+<body class="h-full antialiased text-slate-800 bg-slate-100 flex flex-col md:flex-row overflow-hidden">
+
+  <!-- Sidebar Lateral Institucional con Imagen Corporativa Municipalidad de Santiago -->
+  <aside id="appSidebar" class="w-full md:w-64 bg-muni-900 text-white flex-shrink-0 flex flex-col justify-between shadow-2xl z-20 border-r border-muni-800">
+    <div>
+      <!-- Marca Municipal Oficial -->
+      <div class="px-5 py-5 border-b border-muni-800 flex items-center gap-3 bg-muni-950/70">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-muni-700 to-oro-500 flex items-center justify-center shadow-lg border border-oro-400/40 flex-shrink-0">
+          <!-- Escudo Heráldico Municipalidad de Santiago SVG -->
+          <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.14-2.73 8.01-6 9.07-3.27-1.06-6-4.93-6-9.07V6.43l6-2.25zM11 7v2h2V7h-2zm0 3v5h2v-5h-2z"/>
+          </svg>
+        </div>
+        <div class="overflow-hidden">
+          <div class="font-bold text-xs uppercase tracking-widest text-oro-400">Ilustre Municipalidad</div>
+          <div class="font-extrabold text-sm leading-tight text-white tracking-wide truncate">Santiago</div>
+          <div class="text-[10px] text-slate-300 font-medium truncate">Fomento Productivo · SGE</div>
+        </div>
+      </div>
+
+      <!-- Navegación Principal Idéntica al Sistema Original -->
+      <nav class="p-3 space-y-1 text-sm font-medium" id="sideNav">
+        <button id="navBtnDashboard" onclick="cambiarSeccion('dashboard')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">📊</span>
+          <span class="truncate">Consolidado General</span>
+        </button>
+
+        <button id="navBtnFichas" onclick="cambiarSeccion('fichas')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">👥</span>
+          <span class="truncate">Padrón de Emprendedores</span>
+        </button>
+
+        <button id="navBtnNuevo" onclick="cambiarSeccion('nuevo')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">📝</span>
+          <span class="truncate">Registrar Ficha Nueva</span>
+        </button>
+
+        <button id="navBtnIniciativas" onclick="cambiarSeccion('iniciativas')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">🎪</span>
+          <span class="truncate">Mercados e Iniciativas</span>
+        </button>
+
+        <button id="navBtnSeleccion" onclick="cambiarSeccion('seleccion')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">⚖️</span>
+          <span class="truncate">Selección y Asignación</span>
+        </button>
+
+        <button id="navBtnSeguimiento" onclick="cambiarSeccion('seguimiento')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">☑️</span>
+          <span class="truncate">Seguimiento Post-Mercado</span>
+        </button>
+
+        <button id="navBtnExpediente" onclick="cambiarSeccion('expediente')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">📁</span>
+          <span class="truncate">Documentos & Expedientes</span>
+        </button>
+
+        <button id="navBtnTurso" onclick="cambiarSeccion('turso')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
+          <span class="text-base">🛡️</span>
+          <span class="truncate">Auditoría & Base Turso</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Info del Usuario y Estado de Conexión -->
+    <div class="p-4 border-t border-muni-800 bg-muni-950/80 text-xs">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-200 font-medium truncate" id="sideUserEmail">admin@santiago.cl</span>
+      </div>
+      <div class="text-slate-400 flex justify-between items-center text-[11px]">
+        <span>Conexión Activa:</span>
+        <span class="text-oro-400 font-mono font-semibold">Turso Pipeline v2</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Contenedor Central de Contenido -->
+  <main class="flex-1 flex flex-col h-full overflow-hidden">
+    <!-- Topbar Header Institucional -->
+    <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between flex-shrink-0 shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:block w-1.5 h-7 bg-muni-700 rounded-full"></div>
+        <div>
+          <h1 id="topTitle" class="text-base font-bold text-muni-900 tracking-tight">Consolidado General · Municipalidad de Santiago</h1>
+          <p id="topSubtitle" class="text-xs text-slate-500">Dirección de Desarrollo Local (DIDEL) · Subdirección de Fomento Productivo</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="actualizarDashboardCompleto()" title="Actualizar datos desde Turso" class="p-2 text-slate-500 hover:text-muni-700 hover:bg-slate-100 rounded-lg transition flex items-center gap-1.5 text-xs font-semibold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span class="hidden md:inline">Actualizar</span>
+        </button>
+        <span id="badgeEstadoTurso" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          Base Turso libSQL Online
+        </span>
+      </div>
+    </header>
+
+    <!-- Área de Alertas Toast Flotantes -->
+    <div id="toastArea" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+    <!-- Contenedor con Scroll de Vistas -->
+    <div class="flex-1 overflow-y-auto p-6 bg-slate-50" id="mainContainer">
+
+      <!-- 1. VISTA DASHBOARD CONSOLIDADO CON LOS 6 GRÁFICOS Y CUADROS EXACTOS -->
+      <section id="viewDashboard" class="space-y-6">
+
+        <!-- Barra Superior de Exportación Consolidada y Reportes Totales -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span>📊 Dashboard Integral de Fomento Productivo</span>
+              <span class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">Turso Conectado</span>
+            </h2>
+            <p class="text-xs text-slate-500">Métricas consolidadas de padrón comunal, expedientes, mercados y ventas generadas en la comuna.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="exportarReporteConsolidadoGeneralExcel()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span>Exportar Reporte Total Ferias (.csv)</span>
+            </button>
+            <button onclick="exportarPadronGeneralTotalExcel()" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+              <span>Exportar Padrón Completo (.csv)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Cuadros Superiores Idénticos a la Captura del Sistema Original -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Cuadro 1: Documentación base completa -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-3xl font-extrabold text-slate-800" id="cuadroDocCompleta">0</div>
+            <div class="text-xs text-slate-500 font-medium mt-1">Documentación base completa</div>
+          </div>
+
+          <!-- Cuadro 2: Documentos observados -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-3xl font-extrabold text-slate-800" id="cuadroDocObservada">0</div>
+            <div class="text-xs text-slate-500 font-medium mt-1">Documentos observados</div>
+          </div>
+
+          <!-- Cuadro 3: Casos por completar -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-3xl font-extrabold text-slate-800" id="cuadroCasosCompletar">0</div>
+            <div class="text-xs text-slate-500 font-medium mt-1">Casos por completar</div>
+          </div>
+
+          <!-- Cuadro 4: Duplicados pendientes -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-3xl font-extrabold text-slate-800" id="cuadroDuplicados">0</div>
+            <div class="text-xs text-slate-500 font-medium mt-1">Duplicados pendientes</div>
+          </div>
+        </div>
+
+        <!-- Banner Verde Menta de Estado del Sistema Idéntico a la Imagen -->
+        <div class="bg-emerald-50/90 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs font-medium flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="font-bold">Los gráficos se actualizan con la información vigente del sistema.</span>
+          </div>
+          <div class="text-[11px] text-emerald-700 hidden sm:block">Datos sincronizados con Turso libSQL</div>
+        </div>
+
+        <!-- Grid de los 6 Gráficos Idénticos a la Imagen de Apps Script -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Gráfico 1: Rubros principales -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Rubros principales</div>
+            <div class="h-60 relative">
+              <canvas id="chartRubros"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 2: Nivel de formalización -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Nivel de formalización</div>
+            <div class="h-60 relative">
+              <canvas id="chartFormalizacion"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 3: Comunas de residencia -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Comunas de residencia</div>
+            <div class="h-60 relative">
+              <canvas id="chartComunas"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 4: Distribución por edades -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Distribución por edades</div>
+            <div class="h-60 relative">
+              <canvas id="chartEdades"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 5: Evolución de ventas ($) -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Evolución de ventas ($)</div>
+            <div class="h-60 relative">
+              <canvas id="chartVentas"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 6: Evolución de seguidores Instagram -->
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="font-bold text-xs text-slate-700 mb-3 uppercase tracking-wider">Evolución de seguidores Instagram</div>
+            <div class="h-60 relative">
+              <canvas id="chartSeguidores"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra Complementaria de Métricas Globales de Fomento -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Métricas Globales de Fomento Productivo</div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div class="text-xs text-slate-500">Emprendedores Activos</div>
+              <div class="text-xl font-extrabold text-muni-900 mt-1" id="kpiPersonas">0</div>
+            </div>
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div class="text-xs text-slate-500">Unidades Productivas</div>
+              <div class="text-xl font-extrabold text-muni-700 mt-1" id="kpiEmprendimientos">0</div>
+            </div>
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div class="text-xs text-slate-500">Convocatorias Abiertas</div>
+              <div class="text-xl font-extrabold text-purple-700 mt-1" id="kpiIniciativas">0</div>
+            </div>
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div class="text-xs text-slate-500">Ventas Reportadas ($)</div>
+              <div class="text-xl font-extrabold text-emerald-700 mt-1" id="kpiVentas">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 📊 SECCIÓN: Dashboard especializado por mercado con las 7 Carpetas Operativas de Apps Script -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                <span>📊</span> Dashboard especializado por mercado
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">Selecciona una feria comunal o iniciativa para revisar métricas de participación y las 7 carpetas operativas del expediente.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <label class="text-xs font-semibold text-slate-600">Mercado:</label>
+              <select id="selectorMercadoDashboard" onchange="cambiarMercadoDashboard(this.value)" class="text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 focus:ring-2 focus:ring-muni-600">
+                <option value="">Cargando iniciativas...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Métricas del Mercado Seleccionado -->
+          <div id="panelMetricasMercado" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Postulantes</div>
+              <div class="text-lg font-bold text-slate-800 mt-0.5" id="mercadoTotalPost">--</div>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Titulares Conf.</div>
+              <div class="text-lg font-bold text-emerald-700 mt-0.5" id="mercadoTitulares">--</div>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Suplentes</div>
+              <div class="text-lg font-bold text-amber-700 mt-0.5" id="mercadoSuplentes">--</div>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Cupos Totales</div>
+              <div class="text-lg font-bold text-slate-800 mt-0.5" id="mercadoCupos">--</div>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Ventas ($)</div>
+              <div class="text-lg font-bold text-blue-700 mt-0.5" id="mercadoVentas">--</div>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Asistencia</div>
+              <div class="text-lg font-bold text-purple-700 mt-0.5" id="mercadoAsistencia">--</div>
+            </div>
+          </div>
+
+          <!-- Visualizador de las 7 Carpetas Operativas (Minuta, Gráfica, Programación, Libreto, Fotos, Asistentes, Seleccionados) -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span>📁</span> Carpetas Operativas de Google Apps Script & Drive
+              </h3>
+              <span class="text-[11px] text-slate-400">Estructura automática 7 Subdirectorios</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="gridCarpetasMercado">
+              <!-- Renderizado dinámico de carpetas -->
+              <div class="col-span-full py-6 text-center text-slate-400 text-xs">Selecciona un mercado para ver sus carpetas operativas.</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 2. VISTA PADRÓN DE EMPRENDEDORES (TABLA Y BÚSQUEDA) -->
+      <section id="viewFichas" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div class="w-full md:w-96 relative">
+            <input type="text" id="filtroTermino" placeholder="Buscar por RUT, Nombre o Emprendimiento..." 
+                   class="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-muni-500"
+                   onkeyup="if(event.key === 'Enter') cargarListaFichas()">
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <div class="flex gap-2 w-full md:w-auto">
+            <select id="filtroRubro" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-700 font-medium" onchange="cargarListaFichas()">
+              <option value="">Todos los Rubros</option>
+              <option value="ARTESANIA">Artesanía y Oficios Tradicionales</option>
+              <option value="ALIMENTACION">Alimentación, Gastronomía y Bebidas</option>
+              <option value="TEXTIL">Textil, Confección y Moda de Autor</option>
+              <option value="COSMETICA">Cosmética Natural y Cuidado Personal</option>
+              <option value="ORFEBRERIA">Orfebrería, Joyería y Bisutería Fina</option>
+              <option value="CREATIVAS">Industrias Creativas, Gráfica e Ilustración</option>
+              <option value="HOGAR">Hogar, Decoración y Botánica Urbana</option>
+              <option value="SUSTENTABILIDAD">Economía Circular y Sustentabilidad</option>
+              <option value="TECNOLOGIA">Tecnología y Servicios Profesionales</option>
+              <option value="COMERCIO">Comercio de Especialidad y Regalería</option>
+              <option value="OTRO">Otro Rubro</option>
+            </select>
+            <button onclick="cargarListaFichas()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition">
+              Filtrar
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+              <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <tr>
+                  <th class="px-6 py-3">RUT & Persona</th>
+                  <th class="px-6 py-3">Emprendimiento</th>
+                  <th class="px-6 py-3">Contacto</th>
+                  <th class="px-6 py-3">Formalización SII</th>
+                  <th class="px-6 py-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tablaFichasBody" class="divide-y divide-slate-200 bg-white">
+                <tr>
+                  <td colspan="5" class="px-6 py-8 text-center text-slate-400">Cargando fichas de emprendedores...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. VISTA REGISTRAR FICHA NUEVA / EDITAR FICHA -->
+      <section id="viewNuevo" class="hidden max-w-4xl mx-auto space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <!-- Banner Dinámico de Modo Edición -->
+          <div id="bannerModoEdicion" class="hidden mb-5 p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl">✏️</span>
+              <div>
+                <div class="font-extrabold text-sm text-amber-950">Modo Edición: Actualización de Datos</div>
+                <div class="text-xs text-amber-800" id="bannerModoEdicionTexto">Modificando los datos del emprendedor...</div>
+              </div>
+            </div>
+            <button type="button" onclick="cancelarEdicionFicha()" class="px-3.5 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition shadow-xs">
+              ✕ Cancelar y Volver
+            </button>
+          </div>
+
+          <div class="border-b border-slate-100 pb-4 mb-5">
+            <h2 id="tituloFormFicha" class="text-base font-bold text-slate-800">Formulario de Ficha Integral</h2>
+            <p id="subtituloFormFicha" class="text-xs text-slate-500">Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en Turso.</p>
+          </div>
+
+          <form id="formFicha" onsubmit="guardarFormularioFicha(event)" class="space-y-6">
+            <!-- Campos Ocultos para Control de Edición / Update -->
+            <input type="hidden" id="editIdPersona" value="">
+            <input type="hidden" id="editIdEmprendimiento" value="">
+            <input type="hidden" id="editRutOriginal" value="">
+
+            <!-- Bloque 1: Datos Personales -->
+            <div>
+              <h3 class="text-xs font-bold tracking-wider text-muni-600 uppercase mb-3 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-muni-500"></span> 1. Datos del Emprendedor (Persona Natural)
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">RUT Chileno *</label>
+                  <input type="text" id="inputRut" required placeholder="12.345.678-9" 
+                         onblur="validarRutInput(this)"
+                         class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-muni-500">
+                  <div id="rutFeedback" class="text-xs mt-1"></div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Nombres *</label>
+                  <input type="text" id="inputNombres" required placeholder="Ej: Marcela Andrea" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Apellidos *</label>
+                  <input type="text" id="inputApellidos" required placeholder="Ej: Gómez Soto" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Teléfono Móvil (+569...)</label>
+                  <input type="text" id="inputTelefono" placeholder="+56912345678" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Correo Electrónico</label>
+                  <input type="email" id="inputEmail" placeholder="contacto@ejemplo.cl" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Comuna</label>
+                  <input type="text" id="inputComuna" value="SANTIAGO" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-slate-50">
+                </div>
+              </div>
+            </div>
+
+            <!-- Bloque 2: Datos del Negocio / Emprendimiento -->
+            <div class="border-t border-slate-100 pt-5">
+              <h3 class="text-xs font-bold tracking-wider text-muni-600 uppercase mb-3 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 2. Unidad Productiva / Emprendimiento
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Comercial *</label>
+                  <input type="text" id="inputNombreComercial" required placeholder="Ej: Cerámicas Barrio Yungay" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Rubro Principal *</label>
+                  <select id="inputRubro" required onchange="actualizarSubrubrosFormulario(this.value)" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium">
+                    <option value="">Seleccione un rubro...</option>
+                    <option value="ARTESANIA">Artesanía y Oficios Tradicionales</option>
+                    <option value="ALIMENTACION">Alimentación, Gastronomía y Bebidas</option>
+                    <option value="TEXTIL">Textil, Confección y Moda de Autor</option>
+                    <option value="COSMETICA">Cosmética Natural y Cuidado Personal</option>
+                    <option value="ORFEBRERIA">Orfebrería, Joyería y Bisutería Fina</option>
+                    <option value="CREATIVAS">Industrias Creativas, Gráfica e Ilustración</option>
+                    <option value="HOGAR">Hogar, Decoración y Botánica Urbana</option>
+                    <option value="SUSTENTABILIDAD">Economía Circular y Sustentabilidad</option>
+                    <option value="TECNOLOGIA">Tecnología y Servicios Profesionales</option>
+                    <option value="COMERCIO">Comercio de Especialidad y Regalería</option>
+                    <option value="OTRO">Otro Rubro Emergente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Subrubro Específico *</label>
+                  <select id="inputSubrubro" required class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium">
+                    <option value="">Seleccione primero el rubro...</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Especialidad o Línea de Productos</label>
+                  <input type="text" id="inputEspecialidad" placeholder="Ej: Cerámica gres a mano, repostería vegana..." class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Formalización SII</label>
+                  <select id="inputFormalizacion" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                    <option value="SIN_INICIO">Sin Inicio de Actividades</option>
+                    <option value="PRIMERA_CATEGORIA">1ª Categoría (Empresa / SpA / EIRL)</option>
+                    <option value="SEGUNDA_CATEGORIA">2ª Categoría (Boletas Honorarios)</option>
+                    <option value="PATENTE">Patente Comercial Vigente</option>
+                    <option value="PERSONA_JURIDICA">Persona Jurídica Constituida</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Tramo RSH Comunal</label>
+                  <select id="inputTramoRsh" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                    <option value="SIN_RSH">Sin Registro Social</option>
+                    <option value="HASTA_40">0% a 40% (Mayor vulnerabilidad)</option>
+                    <option value="HASTA_60">41% a 60%</option>
+                    <option value="HASTA_70">61% a 70%</option>
+                    <option value="HASTA_80">71% a 80%</option>
+                    <option value="MAYOR_80">Mayor al 80%</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Instagram (@cuenta)</label>
+                  <input type="text" id="inputInstagram" placeholder="@miemprendimiento" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+                </div>
+                <div class="md:col-span-3">
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Descripción Breve de Productos y Procesos Productivos</label>
+                  <textarea id="inputDescripcion" rows="2" placeholder="Describa los productos elaborados, materias primas utilizadas, técnicas artesanales o servicios ofrecidos..." class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="border-t border-slate-100 pt-4 flex flex-col sm:flex-row justify-end items-center gap-3">
+              <button type="button" id="btnCancelarEdicionPie" onclick="cancelarEdicionFicha()" class="hidden w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition">
+                ✕ Cancelar Edición
+              </button>
+              <button type="button" onclick="cambiarSeccion('fichas')" class="w-full sm:w-auto px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">
+                Volver al Padrón
+              </button>
+              <button type="submit" id="btnGuardarFicha" class="w-full sm:w-auto px-6 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-sm font-semibold rounded-lg shadow-md transition flex items-center justify-center gap-2">
+                <span id="btnGuardarFichaIcono">💾</span>
+                <span id="btnGuardarFichaTexto">Guardar en Turso</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 4. VISTA EXPEDIENTE / SUBIDA A GOOGLE DRIVE -->
+      <section id="viewExpediente" class="hidden max-w-2xl mx-auto space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="border-b border-slate-100 pb-4 mb-5">
+            <h2 class="text-base font-bold text-slate-800">Cargar Documento al Expediente Digital</h2>
+            <p class="text-xs text-slate-500">
+              El archivo se guardará en la estructura organizada de <strong>Google Drive</strong> (<code>SGE / [Año] / Expedientes / [RUT]</code>) y su enlace y metadatos se registrarán en la tabla <code>documentos</code> de <strong>Turso</strong>.
+            </p>
+          </div>
+
+          <form id="formCargaDoc" onsubmit="cargarDocumentoDrive(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">RUT del Emprendedor Titular *</label>
+              <input type="text" id="docRut" required placeholder="12.345.678-9" 
+                     class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Documento *</label>
+              <select id="docTipo" required class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                <option value="CEDULA_IDENTIDAD">Cédula de Identidad (Ambos Lados)</option>
+                <option value="REGISTRO_SOCIAL_HOGARES">Cartola Registro Social de Hogares (RSH)</option>
+                <option value="INICIO_ACTIVIDADES_SII">Certificado Inicio de Actividades SII</option>
+                <option value="RESOLUCION_SANITARIA">Resolución Sanitaria Seremi</option>
+                <option value="FOTOS_PRODUCTOS">Catálogo / Muestras de Productos</option>
+                <option value="OTRO">Otro Certificado</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Archivo (PDF, JPG o PNG) *</label>
+              <input type="file" id="docFile" required accept=".pdf,image/jpeg,image/png"
+                     class="w-full text-sm p-2 border border-dashed border-slate-300 rounded-lg bg-slate-50 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-muni-600 file:text-white hover:file:bg-muni-700">
+            </div>
+
+            <div class="border-t border-slate-100 pt-4 flex justify-end gap-3">
+              <button type="submit" id="btnSubirDoc" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-2">
+                <span>Subir a Google Drive y Registrar</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 4. VISTA GESTIÓN DE FERIAS E INICIATIVAS -->
+      <section id="viewIniciativas" class="hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Convocatorias y Ferias Comunales</h2>
+            <p class="text-xs text-slate-500">Administra iniciativas de fomento productivo, cupos de titulares/suplentes y postulaciones registradas en Turso.</p>
+          </div>
+          <button onclick="mostrarModalCrearIniciativa()" class="px-4 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Nueva Iniciativa
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5" id="listaIniciativasCards">
+          <!-- Tarjetas dinámicas de iniciativas -->
+        </div>
+      </section>
+
+      <!-- 5. VISTA SELECCIÓN Y ASIGNACIÓN A MERCADOS (2 CAMINOS Y GESTIÓN MASIVA) -->
+      <section id="viewSeleccion" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          <!-- Cabecera de la Sección -->
+          <div class="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muni-50 text-muni-700 border border-muni-200">
+                  Gestión Municipal Directa
+                </span>
+                <span class="text-xs text-slate-500 font-medium">Evaluación ágil por funcionarios</span>
+              </div>
+              <h2 class="text-xl font-extrabold text-slate-800 mt-1">Selección y Asignación de Emprendedores</h2>
+              <p class="text-xs text-slate-500">Seleccione emprendedores según rubro, tramo RSH y formalización tributaria. Procese postulaciones masivamente o asigne participantes desde la base comunal.</p>
+            </div>
+            <!-- Selector de Iniciativa Activa y Acciones -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
+              <div class="min-w-[280px]">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Iniciativa / Feria a Gestionar *</label>
+                <select id="selIniciativaSeleccion" class="w-full text-sm font-semibold px-3 py-2 border-2 border-muni-700 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-muni-500" onchange="cambiarMercadoSeleccion(this.value)">
+                  <option value="">Cargando iniciativas...</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-1.5 self-end">
+                <button type="button" onclick="editarMercadoActual()" title="Corregir o editar datos y fechas de este mercado" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1">
+                  <span>✏️</span>
+                  <span class="hidden sm:inline">Editar Mercado</span>
+                </button>
+                <button type="button" onclick="exportarReporteMercadoActualExcel()" title="Exportar reporte detallado de participantes y ventas a Excel" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-300 transition flex items-center gap-1">
+                  <span>📊</span>
+                  <span class="hidden sm:inline">Reporte Feria</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resumen de Cupos y Postulantes de la Feria Seleccionada -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div>
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Postulantes Feria</span>
+              <span id="selTotalPostulantes" class="text-lg font-extrabold text-slate-800">0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Titulares Asignados</span>
+              <span id="selTitularesCupo" class="text-lg font-extrabold text-emerald-700">0 / 0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Suplentes</span>
+              <span id="selSuplentesCupo" class="text-lg font-extrabold text-amber-700">0 / 0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Padrón Disponible</span>
+              <span id="selDisponiblesTotal" class="text-lg font-extrabold text-muni-700">0</span>
+            </div>
+          </div>
+
+          <!-- Pestañas de los 3 Caminos/Vistas Solicitados -->
+          <div class="border-b border-slate-200">
+            <nav class="flex flex-wrap gap-2 sm:gap-4" aria-label="Caminos de Selección">
+              <button id="tabBtnCamino1" onclick="cambiarTabSeleccion('camino1')" class="py-3 px-4 border-b-2 font-bold text-xs sm:text-sm flex items-center gap-2 border-muni-700 text-muni-900 transition">
+                <span>📋 Camino 1: Postulantes a esta Convocatoria</span>
+                <span id="badgeConteoPostulantes" class="px-2 py-0.5 text-xs rounded-full bg-muni-100 text-muni-800 font-bold">0</span>
+              </button>
+              <button id="tabBtnCamino2" onclick="cambiarTabSeleccion('camino2')" class="py-3 px-4 border-b-2 font-bold text-xs sm:text-sm flex items-center gap-2 border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 transition">
+                <span>🌐 Camino 2: Padrón General Comunal</span>
+                <span id="badgeConteoDisponibles" class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700 font-bold">0</span>
+              </button>
+              <button id="tabBtnSeleccionados" onclick="cambiarTabSeleccion('seleccionados')" class="py-3 px-4 border-b-2 font-bold text-xs sm:text-sm flex items-center gap-2 border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 transition">
+                <span>⭐ Nómina Oficial de Seleccionados (Titulares y Suplentes)</span>
+                <span id="badgeConteoSeleccionados" class="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-800 font-bold">0</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- PANEL CAMINO 1: POSTULANTES A LA FERIA -->
+          <!-- ========================================== -->
+          <div id="panelCamino1" class="space-y-4">
+            <!-- Barra de Filtros Camino 1 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Buscar Postulante</label>
+                <input type="text" id="filtroTextoPostulantes" placeholder="RUT, nombre o emprendimiento..." oninput="filtrarTablaPostulantes()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-muni-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Filtrar por Rubro</label>
+                <select id="filtroRubroPostulantes" onchange="filtrarTablaPostulantes()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todos los rubros</option>
+                  <option value="ARTESANIA">Artesanía y Oficios</option>
+                  <option value="ALIMENTACION">Alimentación y Gastronomía</option>
+                  <option value="TEXTIL">Textil y Moda</option>
+                  <option value="COSMETICA">Cosmética Natural</option>
+                  <option value="CREATIVAS">Industrias Creativas</option>
+                  <option value="HOGAR">Hogar y Decoración</option>
+                  <option value="SUSTENTABILIDAD">Sustentabilidad</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Estado de Postulación</label>
+                <select id="filtroEstadoPostulantes" onchange="filtrarTablaPostulantes()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todos los estados</option>
+                  <option value="INGRESADA">INGRESADA (Sin evaluar)</option>
+                  <option value="ADMISIBLE">ADMISIBLE</option>
+                  <option value="TITULAR">TITULAR (Seleccionado)</option>
+                  <option value="SUPLENTE">SUPLENTE</option>
+                  <option value="RECHAZADA">RECHAZADA / NO ADMISIBLE</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Formalización SII</label>
+                <select id="filtroFormalizacionPostulantes" onchange="filtrarTablaPostulantes()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todas las categorías</option>
+                  <option value="PRIMERA_CATEGORIA">1ª Categoría (Empresa)</option>
+                  <option value="SEGUNDA_CATEGORIA">2ª Categoría</option>
+                  <option value="BOLETA_HONORARIOS">Boleta Honorarios</option>
+                  <option value="SIN_INICIO">Sin inicio de actividades</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Barra de Acciones Masivas Camino 1 -->
+            <div class="bg-blue-50/70 border border-blue-200 p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-blue-900 uppercase tracking-wide">Acciones Masivas en Lote:</span>
+                <span id="lblSeleccionadosPostulantes" class="text-xs font-semibold px-2 py-0.5 bg-blue-200 text-blue-900 rounded-full">0 seleccionados</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="asignarMasivoPostulantes('TITULAR')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1">
+                  <span>✓</span> Asignar como Titulares
+                </button>
+                <button type="button" onclick="asignarMasivoPostulantes('SUPLENTE')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1">
+                  <span>⚑</span> Asignar como Suplentes
+                </button>
+                <button type="button" onclick="asignarMasivoPostulantes('ADMISIBLE')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1">
+                  <span>ℹ</span> Marcar Admisibles
+                </button>
+                <button type="button" onclick="asignarMasivoPostulantes('RECHAZADA')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1">
+                  <span>✕</span> Rechazar / No Admisible
+                </button>
+              </div>
+            </div>
+
+            <!-- Tabla de Postulaciones Camino 1 -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div class="overflow-x-auto max-h-[500px]">
+                <table class="w-full text-left text-xs text-slate-700">
+                  <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-3 w-10 text-center">
+                        <input type="checkbox" id="chkTodosPostulantes" onchange="toggleSeleccionarTodosPostulantes(this.checked)" class="rounded text-muni-600 focus:ring-muni-500">
+                      </th>
+                      <th class="px-4 py-3">Emprendimiento</th>
+                      <th class="px-4 py-3">Titular & RUT</th>
+                      <th class="px-4 py-3">Rubro / Subrubro</th>
+                      <th class="px-4 py-3">Formalización & RSH</th>
+                      <th class="px-3 py-3 text-center">Expediente & Calidad</th>
+                      <th class="px-4 py-3">Estado Actual</th>
+                      <th class="px-4 py-3 text-right">Asignación Rápida</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tablaPostulantesBody" class="divide-y divide-slate-200 bg-white">
+                    <tr>
+                      <td colspan="7" class="px-4 py-8 text-center text-slate-400">Seleccione una feria para cargar los postulantes.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- PANEL CAMINO 2: PADRÓN GENERAL DISPONIBLE -->
+          <!-- ========================================== -->
+          <div id="panelCamino2" class="hidden space-y-4">
+            <div class="bg-amber-50/80 border border-amber-200 p-4 rounded-xl text-amber-900 text-xs flex items-start gap-3">
+              <span class="text-lg">ℹ️</span>
+              <div>
+                <p class="font-bold">Emprendedores registrados en el padrón comunal disponibles para el año</p>
+                <p class="text-[11px] text-amber-800 mt-0.5">Seleccione uno o varios emprendedores del padrón e incorpórelos directamente como participantes de la feria activa.</p>
+              </div>
+            </div>
+
+            <!-- Barra de Filtros Camino 2 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Buscar en Padrón</label>
+                <input type="text" id="filtroTextoDisponibles" placeholder="RUT, nombre o emprendimiento..." oninput="filtrarTablaDisponibles()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-muni-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Filtrar por Rubro</label>
+                <select id="filtroRubroDisponibles" onchange="filtrarTablaDisponibles()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todos los rubros</option>
+                  <option value="ARTESANIA">Artesanía y Oficios</option>
+                  <option value="ALIMENTACION">Alimentación y Gastronomía</option>
+                  <option value="TEXTIL">Textil y Moda</option>
+                  <option value="COSMETICA">Cosmética Natural</option>
+                  <option value="CREATIVAS">Industrias Creativas</option>
+                  <option value="HOGAR">Hogar y Decoración</option>
+                  <option value="SUSTENTABILIDAD">Sustentabilidad</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Formalización SII</label>
+                <select id="filtroFormalizacionDisponibles" onchange="filtrarTablaDisponibles()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todas las formalizaciones</option>
+                  <option value="PRIMERA_CATEGORIA">1ª Categoría</option>
+                  <option value="SEGUNDA_CATEGORIA">2ª Categoría</option>
+                  <option value="BOLETA_HONORARIOS">Boleta Honorarios</option>
+                  <option value="SIN_INICIO">Sin inicio</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Comuna Residencia</label>
+                <select id="filtroComunaDisponibles" onchange="filtrarTablaDisponibles()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="">Todas las comunas</option>
+                  <option value="SANTIAGO">Santiago</option>
+                  <option value="PROVIDENCIA">Providencia</option>
+                  <option value="ESTACION_CENTRAL">Estación Central</option>
+                  <option value="QUINTA_NORMAL">Quinta Normal</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Barra de Incorporación Masiva Camino 2 -->
+            <div class="bg-emerald-50/80 border border-emerald-200 p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-emerald-900 uppercase tracking-wide">Incorporar a la Feria Activa:</span>
+                <span id="lblSeleccionadosDisponibles" class="text-xs font-semibold px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full">0 seleccionados</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="incorporarMasivoDisponibles('TITULAR')" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5">
+                  <span>⭐</span> Incorporar como Titulares
+                </button>
+                <button type="button" onclick="incorporarMasivoDisponibles('SUPLENTE')" class="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5">
+                  <span>⚑</span> Incorporar como Suplentes
+                </button>
+              </div>
+            </div>
+
+            <!-- Tabla de Emprendedores Disponibles -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div class="overflow-x-auto max-h-[500px]">
+                <table class="w-full text-left text-xs text-slate-700">
+                  <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-3 w-10 text-center">
+                        <input type="checkbox" id="chkTodosDisponibles" onchange="toggleSeleccionarTodosDisponibles(this.checked)" class="rounded text-emerald-600 focus:ring-emerald-500">
+                      </th>
+                      <th class="px-4 py-3">Emprendimiento</th>
+                      <th class="px-4 py-3">Titular & RUT</th>
+                      <th class="px-4 py-3">Rubro & Subrubro</th>
+                      <th class="px-4 py-3">Formalización & RSH</th>
+                      <th class="px-3 py-3 text-center">Expediente & Calidad</th>
+                      <th class="px-4 py-3">Historial Participaciones</th>
+                      <th class="px-4 py-3 text-right">Asignar Directo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tablaDisponiblesBody" class="divide-y divide-slate-200 bg-white">
+                    <tr>
+                      <td colspan="7" class="px-4 py-8 text-center text-slate-400">Cargando padrón de emprendedores disponibles...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- PANEL NÓMINA OFICIAL DE SELECCIONADOS (TITULARES Y SUPLENTES) -->
+          <!-- ========================================== -->
+          <div id="panelSeleccionados" class="hidden space-y-4">
+            <!-- Barra Superior del Panel de Seleccionados -->
+            <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    Nómina Oficial Aprobada
+                  </span>
+                  <span class="text-xs text-slate-600 font-medium" id="lblMercadoNominaSeleccionados">Mercado Actual</span>
+                </div>
+                <h3 class="text-base font-extrabold text-slate-800 mt-1">Listado Oficial de Titulares y Suplentes</h3>
+                <p class="text-xs text-slate-500">Listado consolidado de adjudicatarios de cupos. Exporte la nómina completa en formato Excel (.csv compatible) para difusión, convocatorias o actas municipales.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="exportarNominaSeleccionadosExcel()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span>📥 Exportar Nómina a Excel (.csv)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filtros de la Nómina de Seleccionados -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-bold text-slate-600">Ver:</span>
+                <button type="button" onclick="filtrarTipoSeleccionados('TODOS')" id="btnFiltroSelTodos" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-white transition">
+                  Todos (<span id="cntSelTodos">0</span>)
+                </button>
+                <button type="button" onclick="filtrarTipoSeleccionados('TITULAR')" id="btnFiltroSelTitular" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                  Titulares (<span id="cntSelTitulares">0</span>)
+                </button>
+                <button type="button" onclick="filtrarTipoSeleccionados('SUPLENTE')" id="btnFiltroSelSuplente" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                  Suplentes (<span id="cntSelSuplentes">0</span>)
+                </button>
+              </div>
+              <div class="w-full sm:w-64">
+                <input type="text" id="filtroTextoSeleccionados" placeholder="Buscar en la nómina..." oninput="filtrarTablaSeleccionados()" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500">
+              </div>
+            </div>
+
+            <!-- Tabla de la Nómina Oficial -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div class="overflow-x-auto max-h-[520px]">
+                <table class="w-full text-left text-xs text-slate-700">
+                  <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-3 w-12 text-center">N°</th>
+                      <th class="px-3 py-3">Cupo Asignado</th>
+                      <th class="px-4 py-3">Emprendimiento</th>
+                      <th class="px-4 py-3">Titular & RUT</th>
+                      <th class="px-4 py-3">Rubro</th>
+                      <th class="px-4 py-3">Contacto Directo</th>
+                      <th class="px-4 py-3">Formalización & RSH</th>
+                      <th class="px-3 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tablaSeleccionadosBody" class="divide-y divide-slate-200 bg-white">
+                    <tr>
+                      <td colspan="8" class="px-4 py-8 text-center text-slate-400">Seleccione postulantes o incorpórelos desde los Caminos 1 y 2 para armar la nómina oficial.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. VISTA SEGUIMIENTO E IMPACTO POST-MERCADO (GRILLA MASIVA EN TERRENO) -->
+      <section id="viewSeguimiento" class="hidden space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          <!-- Cabecera de Seguimiento -->
+          <div class="border-b border-slate-100 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                  Evaluación Masiva en Terreno
+                </span>
+                <span class="text-xs text-slate-500 font-medium">Registro directo post-mercado</span>
+              </div>
+              <h2 class="text-xl font-extrabold text-slate-800 mt-1">Seguimiento e Impacto Post-Mercado</h2>
+              <p class="text-xs text-slate-500">Edite en línea la asistencia, ventas declaradas y valoraciones de todos los participantes de la jornada en una sola grilla ágil.</p>
+            </div>
+            <!-- Selector de Iniciativa para Seguimiento -->
+            <div class="min-w-[280px]">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Iniciativa / Feria Evaluada *</label>
+              <select id="segIniciativaMasivo" class="w-full text-sm font-semibold px-3 py-2 border-2 border-teal-600 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-teal-500" onchange="cargarParticipantesSeguimientoMasivo(this.value)">
+                <option value="">Cargando iniciativas...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Resumen Rápido de la Jornada -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-teal-50/50 p-4 rounded-xl border border-teal-200">
+            <div>
+              <span class="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">Participantes</span>
+              <span id="segTotalParticipantesBadge" class="text-lg font-extrabold text-slate-800">0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">Asistieron Efectivamente</span>
+              <span id="segTotalAsistieronBadge" class="text-lg font-extrabold text-emerald-700">0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">Ventas Totales Declaradas</span>
+              <span id="segTotalVentasBadge" class="text-lg font-extrabold text-teal-800">$0</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-bold text-teal-800 uppercase tracking-wider block">Crecimiento Redes (+Δ Seguidores)</span>
+              <span id="segTotalSeguidoresBadge" class="text-lg font-extrabold text-purple-700">+0</span>
+            </div>
+          </div>
+
+          <!-- PANEL ANALÍTICO: COMPARATIVA DE INGRESOS POR DÍA (FERIAS MULTI-DÍA) -->
+          <div id="panelAnalisisVentasDiarias" class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">📊</span>
+                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Análisis Comparativo de Ingresos por Día del Mercado</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800">Granularidad Temporal</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-500 font-medium">Jornadas activas:</span>
+                <div id="contenedorPildorasJornadas" class="flex items-center gap-1.5 flex-wrap">
+                  <!-- Píldoras dinámicas de días -->
+                </div>
+                <button type="button" onclick="agregarJornadaSeguimiento()" class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-2xs">
+                  <span>➕</span> Agregar Día
+                </button>
+              </div>
+            </div>
+
+            <!-- Métricas Clave de Mayor y Menor Venta -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <!-- Día con Mayor Venta -->
+              <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-extrabold text-base shadow-xs">
+                  ⭐
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-emerald-800 uppercase block">Día de Mayor Venta</span>
+                  <div id="badgeDiaMayorVenta" class="text-sm font-extrabold text-emerald-950">Calculando...</div>
+                  <div id="montoDiaMayorVenta" class="text-xs font-bold text-emerald-700">$0</div>
+                </div>
+              </div>
+
+              <!-- Día con Menor Venta -->
+              <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center font-extrabold text-base shadow-xs">
+                  📉
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-amber-800 uppercase block">Día de Menor Venta</span>
+                  <div id="badgeDiaMenorVenta" class="text-sm font-extrabold text-amber-950">Calculando...</div>
+                  <div id="montoDiaMenorVenta" class="text-xs font-bold text-amber-700">$0</div>
+                </div>
+              </div>
+
+              <!-- Promedio por Emprendimiento -->
+              <div class="p-3 bg-blue-50 rounded-xl border border-blue-200 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-base shadow-xs">
+                  📈
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-blue-800 uppercase block">Promedio por Emprendimiento</span>
+                  <div id="badgePromedioVentasEmp" class="text-sm font-extrabold text-blue-950">$0</div>
+                  <div id="badgeSubtextoPromedio" class="text-xs text-blue-600">Por jornada activa</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gráfico / Barras de Distribución por Día -->
+            <div id="contenedorBarrasDistribucionDias" class="space-y-2 pt-1">
+              <!-- Render dinámico de barras por día -->
+            </div>
+          </div>
+
+          <!-- Grilla Masiva de Evaluación en Terreno -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Planilla de Registro por Emprendimiento con Ventas por Día</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="guardarSeguimientoMasivoEnTerreno()" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5">
+                  <span>💾</span> Guardar Seguimiento Masivo de la Feria
+                </button>
+              </div>
+            </div>
+            <div class="overflow-x-auto max-h-[550px]">
+              <table class="w-full text-left text-xs text-slate-700">
+                <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0 z-10 border-b border-slate-200">
+                  <tr id="tablaSeguimientoHeaderRow">
+                    <th class="px-3 py-3 w-8 text-center">N°</th>
+                    <th class="px-4 py-3 min-w-[180px]">Emprendimiento & RUT</th>
+                    <th class="px-3 py-3 min-w-[120px]">Asistencia</th>
+                    <!-- Columnas dinámicas de días inyectadas aquí -->
+                    <th class="px-3 py-3 min-w-[130px] bg-teal-100/60 font-bold text-teal-900">Total Ventas ($)</th>
+                    <th class="px-3 py-3 min-w-[110px]">Seguidores Antes</th>
+                    <th class="px-3 py-3 min-w-[110px]">Seguidores Después</th>
+                    <th class="px-3 py-3 min-w-[90px] text-center">Crecimiento (Δ)</th>
+                    <th class="px-3 py-3 min-w-[120px]">Evaluación General</th>
+                    <th class="px-3 py-3 min-w-[160px]">Observaciones / Incidencias</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaSeguimientoMasivoBody" class="divide-y divide-slate-200 bg-white">
+                  <tr>
+                    <td colspan="10" class="px-4 py-8 text-center text-slate-400">Seleccione una iniciativa para registrar el seguimiento en terreno.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- Pie de Grilla con Totalizador en Vivo -->
+            <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-5 text-slate-600 font-medium flex-wrap">
+                <span>Ventas Totales en Vivo: <strong id="lblSumaVentasEnVivo" class="text-teal-700 text-sm font-bold">$0</strong></span>
+                <span id="lblDesgloseDiasEnVivo" class="text-slate-500 text-xs"></span>
+                <span>Crecimiento Neto de Seguidores: <strong id="lblSumaSeguidoresEnVivo" class="text-purple-700 text-sm font-bold">+0</strong></span>
+              </div>
+              <button type="button" onclick="guardarSeguimientoMasivoEnTerreno()" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg shadow transition">
+                💾 Guardar Todos los Cambios en Turso
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODAL CREAR O EDITAR INICIATIVA (DATOS COMPLETOS SISTEMA GITHUB) -->
+      <div id="modalCrearIniciativa" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 id="tituloModalIniciativa" class="font-bold text-slate-800 text-base">Registrar Nuevo Mercado / Convocatoria</h3>
+              <p id="subtituloModalIniciativa" class="text-[11px] text-slate-500">Parámetros oficiales del sistema de ferias de la Municipalidad de Santiago</p>
+            </div>
+            <button onclick="cerrarModalCrearIniciativa()" class="text-slate-400 hover:text-slate-600 p-1">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <form id="formCrearIniciativa" onsubmit="guardarNuevaIniciativa(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="iniIdIniciativa" value="">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nombre Oficial del Mercado / Feria *</label>
+              <input type="text" id="iniNombre" required placeholder="Ej: Feria de Emprendimiento y Oficios Barrio Lastarria 2026" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-muni-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Tipo de Iniciativa *</label>
+                <select id="iniTipo" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="FERIA">Feria / Mercado Abierto</option>
+                  <option value="MERCADO_CAMPESINO">Mercado Campesino / Sustentable</option>
+                  <option value="CONVOCATORIA">Convocatoria Pública</option>
+                  <option value="CAPACITACION">Taller / Capacitación</option>
+                  <option value="FONDO_CONCURSABLE">Fondo Concursable</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Temática del Mercado *</label>
+                <select id="iniTematica" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="Artesanía y Oficios Tradicionales">Artesanía y Oficios Tradicionales</option>
+                  <option value="Gastronomía y Dulces Típicos">Gastronomía y Dulces Típicos</option>
+                  <option value="Diseño de Autor y Moda">Diseño de Autor y Moda</option>
+                  <option value="Cosmética Natural y Bienestar">Cosmética Natural y Bienestar</option>
+                  <option value="Orfebrería y Joyería">Orfebrería y Joyería</option>
+                  <option value="Sustentabilidad y Reciclaje">Sustentabilidad y Reciclaje</option>
+                  <option value="Multirrubro / General">Multirrubro / General</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Estado de Convocatoria *</label>
+                <select id="iniEstado" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="ABIERTA">ABIERTA (Convocatoria Activa)</option>
+                  <option value="EN_EVALUACION">EN EVALUACIÓN (Selección)</option>
+                  <option value="EN_EJECUCION">EN EJECUCIÓN (Feria en Terreno)</option>
+                  <option value="FINALIZADA">FINALIZADA (Concluida)</option>
+                  <option value="CANCELADA">CANCELADA</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Objetivo de la Iniciativa</label>
+              <textarea id="iniObjetivo" rows="2" placeholder="Describa el objetivo principal, público destinatario y propósito del espacio comercial..." class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-muni-500"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Barrio de Santiago *</label>
+                <select id="iniBarrio" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                  <option value="Barrio Lastarria">Barrio Lastarria / Parque Forestal</option>
+                  <option value="Barrio Yungay">Barrio Yungay / Plaza Brasil</option>
+                  <option value="Santiago Centro / Cívico">Santiago Centro / Plaza de Armas</option>
+                  <option value="Barrio Bellas Artes">Barrio Bellas Artes</option>
+                  <option value="Barrio Franklin / Biobío">Barrio Franklin / Biobío</option>
+                  <option value="Barrio Matta Sur">Barrio Matta Sur</option>
+                  <option value="Barrio Diez de Julio">Barrio Diez de Julio / Santa Rosa</option>
+                  <option value="Parque Almagro">Parque Almagro / San Diego</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Lugar / Dirección Física *</label>
+                <input type="text" id="iniUbicacion" placeholder="Ej: Paseo Estado entre Agustinas y Huérfanos" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Entidad Organizadora</label>
+                <input type="text" id="iniEntidadOrganizadora" value="Subdirección de Desarrollo Económico Local - DIDECO" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Funcionario / Equipo Responsable</label>
+                <input type="text" id="iniResponsable" value="Equipo de Fomento Productivo" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Cupos Titulares *</label>
+                <input type="number" id="iniCuposTitulares" required min="1" value="20" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Cupos Suplentes *</label>
+                <input type="number" id="iniCuposSuplentes" required min="0" value="10" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div>
+                <span class="block font-bold text-slate-700 mb-1 uppercase text-[10px]">Período de Postulación</span>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] text-slate-500">Apertura</label>
+                    <input type="date" id="iniFechaInicioPost" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-500">Cierre</label>
+                    <input type="date" id="iniFechaCierrePost" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg">
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span class="block font-bold text-slate-700 mb-1 uppercase text-[10px]">Período de Ejecución</span>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] text-slate-500">Inicio Feria</label>
+                    <input type="date" id="iniFechaEjecInicio" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-500">Fin Feria</label>
+                    <input type="date" id="iniFechaEjecFin" class="w-full text-xs px-2 py-1.5 border border-slate-300 rounded-lg">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">URL de Formulario Externo / Bases Concursables (Opcional)</label>
+              <input type="url" id="iniUrlFormulario" placeholder="https://munistgo.cl/convocatorias/mercado-lastarria" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            </div>
+
+            <div class="border-t border-slate-100 pt-3 flex justify-end gap-2">
+              <button type="button" onclick="cerrarModalCrearIniciativa()" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200">Cancelar</button>
+              <button type="submit" id="btnSubmitIniciativa" class="px-5 py-2 bg-muni-600 text-white font-bold rounded-lg shadow hover:bg-muni-700">Guardar Mercado en Turso</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- MODAL EXPEDIENTE DOCUMENTAL Y CALIDAD DE PRODUCTOS (SOLICITADO POR FUNCIONARIOS) -->
+      <div id="modalExpedienteDocumentos" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+          <!-- Cabecera del Modal -->
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800">
+                  📁 Expediente Digital
+                </span>
+                <span id="docModalRubroBadge" class="text-xs text-slate-500 font-semibold"></span>
+              </div>
+              <h3 id="docModalNombreEmprendimiento" class="font-extrabold text-slate-800 text-lg mt-0.5">Cargando...</h3>
+              <p id="docModalTitularRut" class="text-xs text-muni-700 font-medium"></p>
+            </div>
+            <button onclick="cerrarModalDocumentos()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <!-- Diagnóstico de Cumplimiento y Calidad de Productos -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+            <div id="diagFotoCard" class="p-2.5 rounded-lg border bg-white flex flex-col items-start gap-1">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Muestras / Fotos</span>
+              <span id="diagFotoBadge" class="font-bold text-amber-700">Revisando...</span>
+            </div>
+            <div id="diagSiiCard" class="p-2.5 rounded-lg border bg-white flex flex-col items-start gap-1">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Inicio SII</span>
+              <span id="diagSiiBadge" class="font-bold text-slate-700">Revisando...</span>
+            </div>
+            <div id="diagSanitariaCard" class="p-2.5 rounded-lg border bg-white flex flex-col items-start gap-1">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Res. Sanitaria</span>
+              <span id="diagSanitariaBadge" class="font-bold text-slate-500">Revisando...</span>
+            </div>
+            <div id="diagRshCard" class="p-2.5 rounded-lg border bg-white flex flex-col items-start gap-1">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Cartola RSH</span>
+              <span id="diagRshBadge" class="font-bold text-slate-700">Revisando...</span>
+            </div>
+          </div>
+
+          <!-- Lista de Documentos del Expediente -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Archivos y Documentos Almacenados en Google Drive</span>
+              <span id="docConteoTotal" class="text-xs text-slate-500 font-semibold">0 documentos</span>
+            </div>
+            <div id="listaDocsExpediente" class="divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-[300px] overflow-y-auto bg-white">
+              <div class="p-6 text-center text-slate-400 text-xs">Cargando documentos del expediente digital...</div>
+            </div>
+          </div>
+
+          <!-- Pie del Modal -->
+          <div class="border-t border-slate-100 pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span class="text-slate-500 text-[11px]">Los documentos se sincronizan con las carpetas institucionales de Google Drive y Turso.</span>
+            <button type="button" onclick="cerrarModalDocumentos()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow transition">
+              Entendido / Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- MODAL POSTULAR EMPRENDEDOR -->
+      <div id="modalPostular" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="font-bold text-slate-800 text-base">Inscribir Postulante</h3>
+              <p id="modalPostularIniciativaNombre" class="text-xs text-muni-600 font-semibold"></p>
+            </div>
+            <button onclick="cerrarModalPostular()" class="text-slate-400 hover:text-slate-600 p-1">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <form id="formPostular" onsubmit="guardarPostulacionEmprendedor(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="postularIdIniciativa">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">RUT del Emprendedor *</label>
+              <input type="text" id="postularRut" required placeholder="12.345.678-9" class="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg">
+              <p class="text-[11px] text-slate-400 mt-1">El emprendedor debe estar previamente registrado en el padrón.</p>
+            </div>
+            <div class="border-t border-slate-100 pt-3 flex justify-end gap-2">
+              <button type="button" onclick="cerrarModalPostular()" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200">Cancelar</button>
+              <button type="submit" class="px-5 py-2 bg-purple-600 text-white font-bold rounded-lg shadow hover:bg-purple-700">Registrar Postulación</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- 7. VISTA CONFIGURACIÓN Y ESTADO TURSO -->
+      <section id="viewTurso" class="hidden max-w-3xl mx-auto space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="border-b border-slate-100 pb-4 mb-5 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-800">Conexión a Turso (libSQL Pipeline API v2)</h2>
+              <p class="text-xs text-slate-500">Conexión directa vía HTTP puro con UrlFetchApp (sin dependencias de Node)</p>
+            </div>
+            <button onclick="probarConexionTurso()" class="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-100 border border-blue-200 transition">
+              Probar Conexión
+            </button>
+          </div>
+
+          <form id="formTursoConfig" onsubmit="guardarTursoConfig(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Turso Database URL (HTTP)</label>
+              <input type="text" id="cfgTursoUrl" placeholder="https://tu-base-tu-usuario.turso.io" 
+                     class="w-full text-sm font-mono px-3 py-2 border border-slate-300 rounded-lg">
+              <span class="text-[11px] text-slate-400">Si tu URL comienza con <code>libsql://</code>, el sistema la convertirá a <code>https://</code> automáticamente.</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Turso Auth Token (Bearer)</label>
+              <input type="password" id="cfgTursoToken" placeholder="eyJhbGciOiJFZERTQ..." 
+                     class="w-full text-sm font-mono px-3 py-2 border border-slate-300 rounded-lg">
+              <span class="text-[11px] text-slate-400">Generado con <code>turso db tokens create [nombre-db]</code> en tu terminal o en la consola web de Turso.</span>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-slate-100 pt-4">
+              <button type="button" onclick="inicializarTablasTurso()" class="px-4 py-2 bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold rounded-lg hover:bg-amber-100 transition">
+                ⚡ Inicializar Tablas DDL (personas, docs, etc.)
+              </button>
+              <button type="submit" class="px-5 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                Guardar Credenciales
+              </button>
+            </div>
+          </form>
+
+          <!-- Consola de Resultados / Estado -->
+          <div class="mt-6 p-4 rounded-xl bg-slate-900 text-slate-200 font-mono text-xs">
+            <div class="text-slate-400 font-semibold mb-1 flex items-center justify-between">
+              <span>Terminal de Estado:</span>
+              <span class="text-emerald-400 text-[11px]">HTTP Pipeline v2</span>
+            </div>
+            <div id="tursoStatusLog" class="text-slate-300 whitespace-pre-wrap">Sistema listo. Puedes probar la conexión con Turso o inicializar tablas cuando lo desees.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODAL DETALLE DE FICHA -->
+      <div id="modalFicha" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 id="modalNombreTitular" class="font-bold text-slate-800 text-base">Cargando...</h3>
+              <p id="modalRutTitular" class="text-xs text-muni-600 font-mono font-bold"></p>
+            </div>
+            <button onclick="cerrarModalFicha()" class="text-slate-400 hover:text-slate-600 p-1">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div id="modalContenido" class="space-y-4 text-xs text-slate-700">
+            <!-- Dinámico -->
+          </div>
+
+          <div class="border-t border-slate-100 pt-3 flex items-center justify-between gap-2">
+            <button id="btnEditarDesdeModal" onclick="iniciarEdicionDesdeModal()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-xs">
+              <span>✏️</span>
+              <span>Editar Datos de este Emprendedor</span>
+            </button>
+            <button onclick="cerrarModalFicha()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL CARPETA OPERATIVA DEL MERCADO (APPS SCRIPT) -->
+      <div id="modalCarpetaMercado" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2">
+              <span id="modalCarpetaIcono" class="text-2xl">📁</span>
+              <div>
+                <h3 id="modalCarpetaTitulo" class="font-bold text-slate-800 text-base">Carpeta Operativa</h3>
+                <p id="modalCarpetaDesc" class="text-xs text-slate-500">Expediente digital de Google Drive</p>
+              </div>
+            </div>
+            <button onclick="cerrarModalCarpetaMercado()" class="text-slate-400 hover:text-slate-600 p-1">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div id="modalCarpetaContenido" class="space-y-3 text-xs">
+            <!-- Dinámico -->
+          </div>
+
+          <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+            <div class="font-bold text-slate-700 text-xs flex items-center justify-between">
+              <span>Subir documento a esta carpeta</span>
+              <span class="text-[10px] text-slate-400">Drive / Turso</span>
+            </div>
+            <div class="flex gap-2">
+              <input type="file" id="inputArchivoCarpeta" class="text-xs text-slate-500 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-muni-700 file:text-white hover:file:bg-muni-800 w-full">
+              <button onclick="subirArchivoACarpetaMercado()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs transition">
+                Cargar
+              </button>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-3 flex justify-between items-center">
+            <a id="btnLinkDriveCarpeta" href="#" target="_blank" class="text-xs font-semibold text-muni-700 hover:text-muni-900 flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              Abrir carpeta en Google Drive
+            </a>
+            <button onclick="cerrarModalCarpetaMercado()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <?!= include_('Scripts') ?>
+</body>
+</html>
