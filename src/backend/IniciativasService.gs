@@ -1136,7 +1136,7 @@ function guardarSeguimientoMasivo(payload) {
           id_seguimiento, id_iniciativa, id_emprendimiento, asistio,
           ventas_totales_reportadas, seguidores_antes, seguidores_despues, seguidores_ganados,
           evaluacion_general, observaciones, creado_por, creado_en
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'));`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'));`,
         args: [
           idSeg, payload.idIniciativa, f.idEmprendimiento, asistio,
           ventasTotalesFinales, segAntes, segDesp, segGanados, evaluacion, obs, usuario
