@@ -4504,10 +4504,90 @@
   };
 
   // ===== GESTIÓN DE FERIAS E INICIATIVAS =====
+  window.cargarEstadoFormularioOficial = async function() {
+    try {
+      const res = await call('apiObtenerEstadoFormularioOficial');
+      if (res && res.success && res.data) {
+        const d = res.data;
+        const inputUrl = document.getElementById('inputUrlFormularioPublico');
+        const btnVer = document.getElementById('btnAbrirFormPublico');
+        const btnCarpeta = document.getElementById('btnAbrirCarpetaDriveForm');
+
+        if (inputUrl) {
+          inputUrl.value = d.formUrl || 'Formulario no sincronizado aún. Haz clic en "Sincronizar Ferias".';
+        }
+        if (btnVer) {
+          if (d.formUrl) {
+            btnVer.href = d.formUrl;
+            btnVer.classList.remove('opacity-50', 'pointer-events-none');
+          } else {
+            btnVer.href = '#';
+            btnVer.classList.add('opacity-50', 'pointer-events-none');
+          }
+        }
+        if (btnCarpeta) {
+          if (d.carpetaUrl) {
+            btnCarpeta.href = d.carpetaUrl;
+            btnCarpeta.title = `Carpeta en Mi Unidad: ${d.carpetaNombre || 'SGE - Formularios Convocatorias'}`;
+          } else {
+            btnCarpeta.href = '#';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo cargar estado del formulario oficial:', e);
+    }
+  };
+
+  window.sincronizarFormularioOficial = async function(btn) {
+    let originalText = '🔄 Sincronizar Ferias';
+    if (btn) {
+      originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ Sincronizando en Mi Unidad...';
+      btn.disabled = true;
+    }
+
+    try {
+      const res = await call('apiSincronizarFormularioOficial');
+      if (res && res.success && res.data) {
+        mostrarToast(`Formulario oficial sincronizado con ${res.data.totalAbiertas} convocatorias abiertas.`, 'success');
+        await window.cargarEstadoFormularioOficial();
+        await window.cargarIniciativas();
+      } else {
+        mostrarToast('Error sincronizando formulario: ' + (res ? res.error : 'Sin respuesta'), 'error');
+      }
+    } catch (err) {
+      mostrarToast('Error al conectar con Google Forms: ' + err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+  };
+
+  window.copiarEnlaceFormularioPublico = function() {
+    const input = document.getElementById('inputUrlFormularioPublico');
+    if (!input || !input.value || input.value.indexOf('http') < 0) {
+      mostrarToast('Primero sincroniza el formulario para obtener el enlace.', 'warning');
+      return;
+    }
+    navigator.clipboard.writeText(input.value).then(() => {
+      mostrarToast('Enlace del Formulario copiado al portapapeles.', 'success');
+    }).catch(() => {
+      input.select();
+      document.execCommand('copy');
+      mostrarToast('Enlace copiado.', 'success');
+    });
+  };
+
   window.cargarIniciativas = async function() {
     const contenedor = document.getElementById('listaIniciativasCards');
     if (!contenedor) return;
     contenedor.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400">Cargando iniciativas de Turso...</div>';
+
+    // Cargar también estado del formulario público
+    window.cargarEstadoFormularioOficial();
 
     try {
       const res = await call('apiIniciativasListar', { estado: 'ABIERTA' });
@@ -4558,10 +4638,15 @@
               </div>
             </div>
 
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button onclick="abrirModalEditarIniciativa('${ini.id_iniciativa}')" class="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-300 transition flex items-center justify-center gap-1" title="Editar datos o fechas del mercado">
                 ✏️ Editar
               </button>
+              ${ini.url_formulario ? `
+                <a href="${escapeHtml(ini.url_formulario)}" target="_blank" class="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-300 transition flex items-center justify-center gap-1" title="Abrir Formulario de Postulación de este Mercado">
+                  📋 Formulario
+                </a>
+              ` : ''}
               <button onclick="abrirModalPostular('${ini.id_iniciativa}', '${ini.nombre.replace(/'/g, "\\'")}')" class="flex-1 py-2 px-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-lg border border-purple-200 transition">
                 + Inscribir
               </button>

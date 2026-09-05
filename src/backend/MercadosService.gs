@@ -822,9 +822,13 @@ function obtenerOCrearFormularioUnicoMercados_() {
   let id = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_ID);
   let form = abrirFormularioSeguro_(id);
   
+  // Si no está registrado, intentar plantilla existente en Mi Unidad
   if (!form) {
-    const templateId = props.getProperty(APP.PROP_FORM_MERCADO_TEMPLATE_ID);
+    const templateId = props.getProperty(APP.PROP_FORM_MERCADO_TEMPLATE_ID) || '1AxOgL7IYllsA00UpQsQ1wwC44EekhG9cG2ggvE1LpX8';
     form = abrirFormularioSeguro_(templateId);
+    if (form) {
+      props.setProperty(APP.PROP_FORM_MERCADO_UNICO_ID, form.getId());
+    }
   }
   
   if (!form) {
@@ -838,7 +842,7 @@ function obtenerOCrearFormularioUnicoMercados_() {
   if (!form) {
     form = FormApp.create('Postulación a Mercados y Convocatorias - Municipalidad de Santiago');
     form.setDescription('Formulario oficial para postular a ferias, mercados y convocatorias de emprendimiento de la Municipalidad de Santiago. Si ya está registrado en el SGE, ingrese su RUT y se mantendrán sus antecedentes actualizados.');
-    form.setConfirmationMessage('Postulación recibida exitosamente. El equipo municipal revisará los antecedentes según las bases de la convocatoria.');
+    form.setConfirmationMessage('Postulación recibida exitosamente. El equipo municipal de Fomento Productivo revisará los antecedentes según las bases de la convocatoria.');
     asegurarCamposBaseFormularioMercado_(form);
     
     try {
@@ -849,6 +853,15 @@ function obtenerOCrearFormularioUnicoMercados_() {
       form.setDestination(FormApp.DestinationType.SPREADSHEET, db_().getId());
     } catch (ignored) {}
   }
+  
+  // Asegurar que el archivo del formulario resida en la carpeta protegida de "Mi Unidad"
+  try {
+    const formFile = DriveApp.getFileById(form.getId());
+    const carpetaMiUnidad = carpetaFormulariosPublicos_();
+    if (!formFile.getParents().hasNext() || formFile.getParents().next().getId() !== carpetaMiUnidad.getId()) {
+      formFile.moveTo(carpetaMiUnidad);
+    }
+  } catch (ignored) {}
   
   habilitarRespuestasFormulario_(form);
   props.setProperty(APP.PROP_FORM_MERCADO_UNICO_ID, form.getId());
@@ -890,10 +903,32 @@ function sincronizarMercadosEnFormularioUnico_() {
     try { form.moveItem(selectorItem.getIndex(), 0); } catch (ignored) {}
   }
   
-  const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: false });
-  const abiertas = iniciativas.filter(function(i) {
-    return i.ESTADO === 'ABIERTA';
-  });
+  // 1. Obtener iniciativas abiertas desde Turso
+  let abiertas = [];
+  try {
+    if (typeof tursoEjecutar === 'function') {
+      const qTurso = tursoEjecutar("SELECT id_iniciativa, nombre FROM iniciativas WHERE estado IN ('ABIERTA', 'PUBLICADA', 'EN_EVALUACION');");
+      if (qTurso && qTurso.success && qTurso.data && Array.isArray(qTurso.data.rows)) {
+        abiertas = qTurso.data.rows.map(function(r) {
+          return { ID_INICIATIVA: r.id_iniciativa, NOMBRE: r.nombre };
+        });
+      }
+    }
+  } catch (e) {
+    Logger.log('Aviso consulta Turso en sincronización: ' + e.message);
+  }
+  
+  // 2. Si Turso no retornó o no está activo, usar Google Sheets como respaldo
+  if (abiertas.length === 0) {
+    try {
+      const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: false });
+      abiertas = iniciativas.filter(function(i) {
+        return i.ESTADO === 'ABIERTA';
+      }).map(function(i) {
+        return { ID_INICIATIVA: i.ID_INICIATIVA, NOMBRE: i.NOMBRE };
+      });
+    } catch (e) {}
+  }
   
   const formUrl = form.getPublishedUrl();
   const props = PropertiesService.getScriptProperties();
@@ -906,19 +941,28 @@ function sincronizarMercadosEnFormularioUnico_() {
     selectorItem.asListItem().setChoiceValues(opciones);
     habilitarRespuestasFormulario_(form);
     
+    // Actualizar URL del formulario en Turso y en Sheets
     abiertas.forEach(function(i) {
-      if (i.URL_FORMULARIO_POSTULACION !== formUrl) {
+      try {
+        if (typeof tursoEjecutar === 'function') {
+          tursoEjecutar("UPDATE iniciativas SET url_formulario = ? WHERE id_iniciativa = ?;", [formUrl, i.ID_INICIATIVA]);
+        }
+      } catch (ignored) {}
+      try {
         repoActualizar('INICIATIVAS', i.ID_INICIATIVA, { URL_FORMULARIO_POSTULACION: formUrl }, { motivo: 'Vinculación a Formulario Único Oficial' });
-      }
+      } catch (ignored) {}
     });
   } else {
     selectorItem.asListItem().setChoiceValues(['No hay convocatorias abiertas en este momento']);
   }
   
+  const carpetaPublica = carpetaFormulariosPublicos_();
   return {
     formId: form.getId(),
     formUrl: formUrl,
     editUrl: form.getEditUrl(),
+    carpetaDriveUrl: carpetaPublica ? carpetaPublica.getUrl() : '',
+    carpetaDriveId: carpetaPublica ? carpetaPublica.getId() : '',
     totalAbiertas: abiertas.length,
     mercados: abiertas.map(function(i) { return i.NOMBRE; })
   };
@@ -1130,6 +1174,82 @@ function procesarPostulacionMercadoFormulario(e) {
           ACTUALIZADO_POR: 'FORMULARIO_MERCADO'
         });
       }
+
+      // === SINCRONIZACIÓN CON TURSO (Base de Datos Relacional) ===
+      try {
+        if (typeof tursoEjecutar === 'function') {
+          // 1. Guardar o actualizar Ficha en Turso con validaciones chilenas
+          const tursoPayload = {
+            rut: personaData.RUT,
+            nombres: personaData.NOMBRES,
+            apellidos: ((personaData.APELLIDO_PATERNO || '') + ' ' + (personaData.APELLIDO_MATERNO || '')).trim(),
+            email: personaData.EMAIL || '',
+            telefono: personaData.TELEFONO || '',
+            comuna: personaData.COMUNA_RESIDENCIA || 'SANTIAGO',
+            nombreComercial: empData.NOMBRE_COMERCIAL,
+            rubro: empData.ID_RUBRO,
+            subrubro: empData.ID_SUBRUBRO || '',
+            formalizacionSii: empData.FORMALIZACION || 'SIN_INICIO',
+            instagram: empData.INSTAGRAM || '',
+            descripcionProducto: empData.DESCRIPCION || '',
+            usuarioEmail: 'FORMULARIO_MERCADO'
+          };
+          
+          if (typeof guardarFichaEmprendedor === 'function') {
+            const tursoFicha = guardarFichaEmprendedor(tursoPayload);
+            if (tursoFicha && tursoFicha.success && tursoFicha.data) {
+              const idPerTurso = tursoFicha.data.idPersona;
+              const idEmpTurso = tursoFicha.data.idEmprendimiento;
+
+              // 2. Insertar o actualizar Postulación en Turso
+              const qCheckPost = tursoEjecutar(
+                "SELECT id_postulacion FROM postulaciones WHERE id_iniciativa = ? AND id_emprendimiento = ? LIMIT 1;",
+                [idIniciativa, idEmpTurso]
+              );
+              if (qCheckPost && qCheckPost.success && qCheckPost.data && qCheckPost.data.rows && qCheckPost.data.rows.length > 0) {
+                tursoEjecutar(
+                  "UPDATE postulaciones SET id_persona_contacto = ?, estado_postulacion = 'INGRESADA', actualizado_en = datetime('now') WHERE id_postulacion = ?;",
+                  [idPerTurso, qCheckPost.data.rows[0].id_postulacion]
+                );
+              } else {
+                tursoEjecutar(
+                  `INSERT INTO postulaciones (
+                    id_postulacion, id_iniciativa, id_emprendimiento, id_persona_contacto,
+                    fecha_postulacion, estado_postulacion, observaciones, creado_por, creado_en
+                  ) VALUES (?, ?, ?, ?, datetime('now'), 'INGRESADA', ?, 'FORMULARIO_MERCADO', datetime('now'));`,
+                  ['post-' + Utilities.getUuid(), idIniciativa, idEmpTurso, idPerTurso, 'Postulación recibida desde Formulario Oficial de Google']
+                );
+              }
+
+              // 3. Procesar documentos cargados: mover a carpetas organizadas y registrar en Turso
+              if (typeof DOCUMENTOS_FORMULARIO_REGISTRO !== 'undefined') {
+                DOCUMENTOS_FORMULARIO_REGISTRO.forEach(function(config) {
+                  const rawAns = respuestaDocumentoFormulario_(answers, config);
+                  const fileIds = idsArchivosRespuestaFormulario_(rawAns);
+                  fileIds.forEach(function(fid) {
+                    try {
+                      const fDrive = DriveApp.getFileById(fid);
+                      if (typeof cargarDocumentoExpediente === 'function') {
+                        cargarDocumentoExpediente({
+                          rut: personaData.RUT,
+                          tipoDocumento: config.tipoDocumento || 'OTRO',
+                          archivo: fDrive.getBlob(),
+                          usuarioEmail: 'FORMULARIO_MERCADO'
+                        });
+                      }
+                    } catch (errDoc) {
+                      Logger.log('Aviso al procesar documento para Turso: ' + errDoc.message);
+                    }
+                  });
+                });
+              }
+            }
+          }
+        }
+      } catch (errTurso) {
+        Logger.log('Error general al sincronizar postulación con Turso: ' + errTurso.message);
+      }
+
       repoInsertar('REGISTROS_FORMULARIO', {
         ID_REGISTRO_FORMULARIO: uuid_(),
         FECHA_RECEPCION: received,

@@ -596,6 +596,45 @@
 
       <!-- 4. VISTA GESTIÓN DE FERIAS E INICIATIVAS -->
       <section id="viewIniciativas" class="hidden space-y-6">
+        <!-- Banner del Formulario Único Oficial en Mi Unidad -->
+        <div class="bg-gradient-to-r from-blue-900 to-muni-800 text-white p-5 rounded-2xl shadow-md space-y-3">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl flex-shrink-0 border border-white/20">
+                📝
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="font-extrabold text-sm text-white">Formulario Oficial de Postulación para Emprendedores</h3>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                    Alojado en Mi Unidad · Seguro
+                  </span>
+                </div>
+                <p class="text-xs text-blue-200 mt-0.5">Los postulantes adjuntan cédula, RSH, SII y fotos de productos. El sistema los guarda en Drive e ingresa en Turso automáticamente.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="sincronizarFormularioOficial(this)" class="px-3.5 py-2 bg-oro-500 hover:bg-oro-600 text-slate-900 font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5 flex-shrink-0">
+                <span>🔄</span> Sincronizar Ferias
+              </button>
+              <a id="btnAbrirFormPublico" href="#" target="_blank" class="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition flex items-center gap-1.5 flex-shrink-0">
+                <span>🌐</span> Ver Formulario
+              </a>
+              <a id="btnAbrirCarpetaDriveForm" href="#" target="_blank" class="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition flex items-center justify-center" title="Abrir carpeta protegida en Mi Unidad">
+                <span>📁</span>
+              </a>
+            </div>
+          </div>
+          
+          <div class="bg-black/20 p-2.5 rounded-xl border border-white/10 flex items-center gap-2 text-xs">
+            <span class="text-blue-200 font-semibold flex-shrink-0">Enlace Público para difusión:</span>
+            <input type="text" id="inputUrlFormularioPublico" readonly value="Cargando enlace del formulario..." class="w-full bg-transparent font-mono text-white text-xs border-0 focus:ring-0 select-all truncate">
+            <button type="button" onclick="copiarEnlaceFormularioPublico()" class="px-3 py-1 bg-white text-muni-900 hover:bg-blue-50 font-bold text-[11px] rounded-lg shadow transition flex items-center gap-1 flex-shrink-0">
+              <span>📋</span> Copiar Link
+            </button>
+          </div>
+        </div>
+
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div>
             <h2 class="text-base font-bold text-slate-800">Convocatorias y Ferias Comunales</h2>

@@ -372,7 +372,67 @@ function apiObtenerResumenVentasPorDia(idIniciativa) {
   } catch (error) {
     return { success: false, data: null, error: error.message };
   }
+}/**
+ * API RPC: Sincroniza las convocatorias abiertas en el Formulario Único Oficial de Postulaciones (en Mi Unidad).
+ */
+function apiSincronizarFormularioOficial() {
+  try {
+    const res = sincronizarMercadosEnFormularioUnico_();
+    if (!res) {
+      return { success: false, data: null, error: 'No se pudo inicializar o sincronizar el formulario único.' };
+    }
+    return { success: true, data: res, error: null };
+  } catch (error) {
+    return { success: false, data: null, error: error.message || String(error) };
+  }
 }
 
+/**
+ * API RPC: Consulta el estado del Formulario Único Oficial de Postulaciones y su carpeta en Mi Unidad.
+ */
+function apiObtenerEstadoFormularioOficial() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const formUrl = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_URL) || '';
+    const formId = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_ID) || '';
+    const carpeta = carpetaFormulariosPublicos_();
+    
+    return {
+      success: true,
+      data: {
+        formId: formId,
+        formUrl: formUrl,
+        carpetaNombre: carpeta ? carpeta.getName() : 'SGE - Formularios Convocatorias',
+        carpetaUrl: carpeta ? carpeta.getUrl() : '',
+        carpetaId: carpeta ? carpeta.getId() : ''
+      },
+      error: null
+    };
+  } catch (error) {
+    return { success: false, data: null, error: error.message || String(error) };
+  }
+}
 
-
+/**
+ * API RPC: Configura una carpeta personalizada en Mi Unidad para alojar formularios públicos y cargas.
+ */
+function apiConfigurarCarpetaMiUnidadFormulario(payload) {
+  try {
+    if (!payload || !payload.folderId) {
+      return { success: false, data: null, error: 'Debe ingresar el ID de la carpeta.' };
+    }
+    const folder = DriveApp.getFolderById(payload.folderId);
+    PropertiesService.getScriptProperties().setProperty('DRIVE_MI_UNIDAD_FORM_FOLDER_ID', folder.getId());
+    return {
+      success: true,
+      data: {
+        id: folder.getId(),
+        nombre: folder.getName(),
+        url: folder.getUrl()
+      },
+      error: null
+    };
+  } catch (error) {
+    return { success: false, data: null, error: 'No se pudo acceder a la carpeta: ' + error.message };
+  }
+}

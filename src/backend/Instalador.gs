@@ -538,9 +538,20 @@ function crearFormularioUnicoRegistro() {
 }
 
 function carpetaFormulariosPublicos_() {
+  const props = PropertiesService.getScriptProperties();
+  const customId = props.getProperty('DRIVE_MI_UNIDAD_FORM_FOLDER_ID');
+  if (customId) {
+    try {
+      return DriveApp.getFolderById(customId);
+    } catch (e) {}
+  }
   const rootPersonal = DriveApp.getRootFolder();
   const folders = rootPersonal.getFoldersByName('SGE - Formularios Convocatorias');
-  return folders.hasNext() ? folders.next() : rootPersonal.createFolder('SGE - Formularios Convocatorias');
+  const folder = folders.hasNext() ? folders.next() : rootPersonal.createFolder('SGE - Formularios Convocatorias');
+  try {
+    props.setProperty('DRIVE_MI_UNIDAD_FORM_FOLDER_ID', folder.getId());
+  } catch (e) {}
+  return folder;
 }
 
 /**
