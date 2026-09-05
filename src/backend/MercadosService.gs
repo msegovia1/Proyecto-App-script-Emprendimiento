@@ -880,6 +880,17 @@ function obtenerOCrearFormularioUnicoMercados_() {
   return form;
 }
 
+function fijarOpcionesItemFormulario_(item, opciones) {
+  if (!item) return;
+  if (typeof item.setChoiceValues === 'function') {
+    item.setChoiceValues(opciones);
+  } else if (typeof item.asListItem === 'function') {
+    item.asListItem().setChoiceValues(opciones);
+  } else if (typeof item.asMultipleChoiceItem === 'function') {
+    item.asMultipleChoiceItem().setChoiceValues(opciones);
+  }
+}
+
 function sincronizarMercadosEnFormularioUnico_() {
   const form = obtenerOCrearFormularioUnicoMercados_();
   if (!form) return null;
@@ -938,7 +949,7 @@ function sincronizarMercadosEnFormularioUnico_() {
     const opciones = abiertas.map(function(i) {
       return i.NOMBRE + ' [ID: ' + i.ID_INICIATIVA + ']';
     });
-    selectorItem.asListItem().setChoiceValues(opciones);
+    fijarOpcionesItemFormulario_(selectorItem, opciones);
     habilitarRespuestasFormulario_(form);
     
     // Actualizar URL del formulario en Turso y en Sheets
@@ -953,7 +964,7 @@ function sincronizarMercadosEnFormularioUnico_() {
       } catch (ignored) {}
     });
   } else {
-    selectorItem.asListItem().setChoiceValues(['No hay convocatorias abiertas en este momento']);
+    fijarOpcionesItemFormulario_(selectorItem, ['No hay convocatorias abiertas en este momento']);
   }
   
   const carpetaPublica = carpetaFormulariosPublicos_();
