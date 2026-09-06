@@ -982,13 +982,20 @@ function sincronizarMercadosEnFormularioUnico_() {
     fijarOpcionesItemFormulario_(selectorItem, ['No hay convocatorias abiertas en este momento']);
   }
   
+  let carpetaCompartida = null;
+  try {
+    carpetaCompartida = carpetaRoot_();
+  } catch (e) {}
   const carpetaPublica = carpetaFormulariosPublicos_();
+  const urlCompartida = carpetaCompartida ? carpetaCompartida.getUrl() : 'https://drive.google.com/drive/folders/1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
+  
   return {
     formId: form.getId(),
     formUrl: formUrl,
     editUrl: form.getEditUrl(),
-    carpetaDriveUrl: carpetaPublica ? carpetaPublica.getUrl() : '',
-    carpetaDriveId: carpetaPublica ? carpetaPublica.getId() : '',
+    carpetaDriveUrl: urlCompartida,
+    carpetaDriveId: carpetaCompartida ? carpetaCompartida.getId() : '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm',
+    carpetaMiUnidadUrl: carpetaPublica ? carpetaPublica.getUrl() : '',
     totalAbiertas: abiertas.length,
     mercados: abiertas.map(function(i) { return i.NOMBRE; })
   };

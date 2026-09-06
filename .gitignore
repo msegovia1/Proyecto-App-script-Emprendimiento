@@ -3,3 +3,7 @@
 /Index.html
 .DS_Store
 *.log
+*.png
+*.svg
+public/
+build-logos.js

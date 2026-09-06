@@ -4592,12 +4592,9 @@
           }
         }
         if (btnCarpeta) {
-          if (d.carpetaUrl) {
-            btnCarpeta.href = d.carpetaUrl;
-            btnCarpeta.title = `Carpeta en Mi Unidad: ${d.carpetaNombre || 'SGE - Formularios Convocatorias'}`;
-          } else {
-            btnCarpeta.href = '#';
-          }
+          const urlDestino = d.carpetaUrl || 'https://drive.google.com/drive/folders/1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
+          btnCarpeta.href = urlDestino;
+          btnCarpeta.title = `Abrir Unidad Compartida: ${d.carpetaNombre || 'DIDEL - Sistema de Gestión de Emprendimientos'}`;
         }
       }
     } catch (e) {

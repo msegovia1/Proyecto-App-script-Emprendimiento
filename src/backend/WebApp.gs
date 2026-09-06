@@ -442,16 +442,25 @@ function apiObtenerEstadoFormularioOficial() {
     const props = PropertiesService.getScriptProperties();
     const formUrl = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_URL) || '';
     const formId = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_ID) || '';
-    const carpeta = carpetaFormulariosPublicos_();
+    
+    // Obtener la carpeta raíz de la Unidad Compartida
+    let carpetaCompartida = null;
+    try {
+      carpetaCompartida = carpetaRoot_();
+    } catch (e) {}
+    
+    const carpetaMiUnidad = carpetaFormulariosPublicos_();
+    const urlCompartida = carpetaCompartida ? carpetaCompartida.getUrl() : 'https://drive.google.com/drive/folders/1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
     
     return {
       success: true,
       data: {
         formId: formId,
         formUrl: formUrl,
-        carpetaNombre: carpeta ? carpeta.getName() : 'SGE - Formularios Convocatorias',
-        carpetaUrl: carpeta ? carpeta.getUrl() : '',
-        carpetaId: carpeta ? carpeta.getId() : ''
+        carpetaNombre: carpetaCompartida ? carpetaCompartida.getName() : 'DIDEL - Sistema de Gestión de Emprendimientos',
+        carpetaUrl: urlCompartida,
+        carpetaId: carpetaCompartida ? carpetaCompartida.getId() : '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm',
+        carpetaMiUnidadUrl: carpetaMiUnidad ? carpetaMiUnidad.getUrl() : ''
       },
       error: null
     };
