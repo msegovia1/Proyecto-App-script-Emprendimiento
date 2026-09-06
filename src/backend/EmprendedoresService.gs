@@ -88,7 +88,7 @@ function guardarFichaEmprendedor(payload) {
           sanitizarTexto(payload.apellidos),
           emailValidado,
           telefonoValidado,
-          sanitizarTexto(payload.comuna || 'SANTIAGO'),
+          normalizarComuna(payload.comuna),
           sanitizarTexto(payload.direccion || ''),
           sanitizarTexto(payload.genero || 'NO_INFORMA'),
           sanitizarTexto(payload.tramoRsh || 'SIN_RSH'),
@@ -113,7 +113,7 @@ function guardarFichaEmprendedor(payload) {
           sanitizarTexto(payload.apellidos),
           emailValidado,
           telefonoValidado,
-          sanitizarTexto(payload.comuna || 'SANTIAGO'),
+          normalizarComuna(payload.comuna),
           sanitizarTexto(payload.direccion || ''),
           sanitizarTexto(payload.genero || 'NO_INFORMA'),
           sanitizarTexto(payload.tramoRsh || 'SIN_RSH'),
@@ -194,17 +194,12 @@ function guardarFichaEmprendedor(payload) {
         ]
       });
 
-      // Crear vinculación en persona_emprendimiento y en vinculaciones
+      // Crear vinculación oficial en persona_emprendimiento
       const idVinculacion = 'vinc-' + generarUuid_();
       stmts.push({
         sql: `INSERT INTO persona_emprendimiento (id_vinculacion, id_persona, id_emprendimiento, rol, es_titular_principal, creado_por)
               VALUES (?, ?, ?, 'TITULAR', 1, ?)`,
         args: [idVinculacion, idPersona, idEmprendimiento, payload.usuarioEmail || 'sistema@santiago.cl']
-      });
-      stmts.push({
-        sql: `INSERT OR IGNORE INTO vinculaciones (id_vinculacion, id_persona, id_emprendimiento, rol, es_contacto_principal)
-              VALUES (?, ?, ?, 'TITULAR', 1);`,
-        args: [idVinculacion, idPersona, idEmprendimiento]
       });
     }
 
@@ -320,10 +315,10 @@ function obtenerFichaIntegral(rutOId) {
 
     // Buscar emprendimientos vinculados
     const qEmps = tursoEjecutar(
-      `SELECT e.*, v.rol, v.es_contacto_principal 
+      `SELECT e.*, pe.rol, pe.es_titular_principal AS es_contacto_principal 
        FROM emprendimientos e
-       INNER JOIN vinculaciones v ON v.id_emprendimiento = e.id_emprendimiento
-       WHERE v.id_persona = ? AND e.activo = 1`,
+       INNER JOIN persona_emprendimiento pe ON pe.id_emprendimiento = e.id_emprendimiento
+       WHERE pe.id_persona = ? AND COALESCE(e.estado, 'ACTIVO') != 'INACTIVO'`,
       [idPersona]
     );
 
@@ -331,7 +326,7 @@ function obtenerFichaIntegral(rutOId) {
     const qDocs = tursoEjecutar(
       `SELECT * FROM documentos 
        WHERE (id_persona = ? OR id_emprendimiento IN (
-         SELECT id_emprendimiento FROM vinculaciones WHERE id_persona = ?
+         SELECT id_emprendimiento FROM persona_emprendimiento WHERE id_persona = ?
        ))
        ORDER BY creado_en DESC`,
       [idPersona, idPersona]
@@ -378,27 +373,28 @@ function listarFichasEmprendedores(filtros = {}) {
   try {
     const termino = (filtros.termino || '').trim();
     const rubro = (filtros.rubro || '').trim();
-    const limite = Math.min(parseInt(filtros.limite, 10) || 50, 100);
+    const limite = Math.min(parseInt(filtros.limite || filtros.limit, 10) || 50, 1000);
 
     let sql = `
       SELECT 
         p.id_persona, p.rut, p.rut_formateado, p.nombres, p.apellidos, 
-        p.email, p.telefono, p.comuna, p.tramo_rsh,
-        e.id_emprendimiento, e.nombre_comercial, e.rubro, e.subrubro, e.formalizacion_sii,
-        v.rol
+        p.email, p.telefono, p.comuna, p.direccion, p.tramo_rsh,
+        e.id_emprendimiento, e.codigo_comercial, e.nombre_comercial, e.nombre_fantasia,
+        e.rubro, e.subrubro, e.formalizacion_sii, e.etapa_madurez, e.instagram, e.descripcion_producto,
+        pe.rol
       FROM personas p
-      LEFT JOIN vinculaciones v ON v.id_persona = p.id_persona
-      LEFT JOIN emprendimientos e ON e.id_emprendimiento = v.id_emprendimiento
-      WHERE p.activo = 1
+      LEFT JOIN persona_emprendimiento pe ON pe.id_persona = p.id_persona
+      LEFT JOIN emprendimientos e ON e.id_emprendimiento = pe.id_emprendimiento
+      WHERE COALESCE(p.estado, 'ACTIVO') != 'INACTIVO'
     `;
     const args = [];
 
     if (termino) {
       const terminoLimpio = normalizarRut(termino);
-      sql += ` AND (p.rut LIKE ? OR p.nombres LIKE ? OR p.apellidos LIKE ? OR e.nombre_comercial LIKE ?)`;
+      sql += ` AND (p.rut LIKE ? OR p.rut_formateado LIKE ? OR p.nombres LIKE ? OR p.apellidos LIKE ? OR e.nombre_comercial LIKE ? OR e.nombre_fantasia LIKE ?)`;
       const likeTerm = `%${termino}%`;
       const likeRut = `%${terminoLimpio || termino}%`;
-      args.push(likeRut, likeTerm, likeTerm, likeTerm);
+      args.push(likeRut, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
     }
 
     if (rubro) {
@@ -428,10 +424,11 @@ function listarFichasEmprendedores(filtros = {}) {
             apellidos: p.APELLIDOS,
             email: p.EMAIL,
             telefono: p.TELEFONO,
-            comuna: p.COMUNA || 'SANTIAGO',
+            comuna: normalizarComuna(p.COMUNA || 'Santiago'),
             tramo_rsh: p.TRAMO_RSH,
             id_emprendimiento: e.ID_EMPRENDIMIENTO || '',
             nombre_comercial: e.NOMBRE_COMERCIAL || 'Sin Emprendimiento',
+            nombre_fantasia: e.NOMBRE_FANTASIA || '',
             rubro: e.ID_RUBRO || 'OTRO',
             subrubro: e.ID_SUBRUBRO || '',
             formalizacion_sii: e.FORMALIZACION_SII || 'SIN_INICIO',
@@ -448,9 +445,16 @@ function listarFichasEmprendedores(filtros = {}) {
       return { success: false, data: null, error: query.error };
     }
 
+    const rows = (query.data.rows || []).map(r => {
+      if (r.comuna) {
+        r.comuna = normalizarComuna(r.comuna);
+      }
+      return r;
+    });
+
     return {
       success: true,
-      data: query.data.rows || [],
+      data: rows,
       error: null
     };
   } catch (err) {

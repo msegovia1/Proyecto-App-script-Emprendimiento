@@ -397,10 +397,16 @@ function obtenerDashboardConsolidado() {
 
     // 3. Gráfico Comunas de Residencia
     const qComunas = tursoEjecutar(`
-      SELECT COALESCE(comuna, 'Santiago') as comuna, COUNT(*) as cantidad
+      SELECT 
+        CASE 
+          WHEN UPPER(TRIM(comuna)) IN ('SANTIAGO', 'STGO', 'SANTIAGO CENTRO', 'COMUNA DE SANTIAGO') THEN 'Santiago'
+          WHEN comuna IS NULL OR TRIM(comuna) = '' THEN 'Santiago'
+          ELSE TRIM(comuna)
+        END as comuna_norm,
+        COUNT(*) as cantidad
       FROM personas
       WHERE estado = 'ACTIVO'
-      GROUP BY comuna
+      GROUP BY comuna_norm
       ORDER BY cantidad DESC;
     `);
 
@@ -464,8 +470,21 @@ function obtenerDashboardConsolidado() {
       formList = [{ etiqueta: 'Sin inicio de actividades', cantidad: 1 }];
     }
 
-    // Normalizar comunas
-    let comunasList = (qComunas.success && qComunas.data.rows) || [];
+    // Normalizar comunas agrupando insensible a mayúsculas y unificando 'Santiago'
+    const comunasMap = {};
+    const rawComunas = (qComunas.success && qComunas.data.rows) || [];
+    rawComunas.forEach(r => {
+      const val = r.comuna_norm || r.comuna || 'Santiago';
+      const nombreNorm = typeof normalizarComuna_ === 'function' 
+        ? normalizarComuna_(val) 
+        : (typeof normalizarComuna === 'function' ? normalizarComuna(val) : val);
+      comunasMap[nombreNorm] = (comunasMap[nombreNorm] || 0) + Number(r.cantidad || 0);
+    });
+    let comunasList = Object.keys(comunasMap).map(c => ({
+      comuna: c,
+      cantidad: comunasMap[c]
+    })).sort((a, b) => b.cantidad - a.cantidad);
+
     if (comunasList.length === 0) {
       comunasList = [{ comuna: 'Santiago', cantidad: 1 }];
     }
@@ -742,7 +761,7 @@ function obtenerEmprendedoresDisponibles(filtro) {
       params.push(filtro.formalizacion);
     }
     if (filtro && filtro.comuna) {
-      sql += ` AND per.comuna = ?`;
+      sql += ` AND UPPER(TRIM(per.comuna)) = UPPER(TRIM(?))`;
       params.push(filtro.comuna);
     }
 
@@ -753,9 +772,16 @@ function obtenerEmprendedoresDisponibles(filtro) {
       return { success: false, data: null, error: res.error };
     }
 
+    const rows = (res.data.rows || []).map(r => {
+      if (r.comuna) {
+        r.comuna = typeof normalizarComuna_ === 'function' ? normalizarComuna_(r.comuna) : r.comuna;
+      }
+      return r;
+    });
+
     return {
       success: true,
-      data: res.data.rows || [],
+      data: rows,
       error: null
     };
   } catch (err) {

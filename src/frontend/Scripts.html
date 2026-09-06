@@ -3583,9 +3583,12 @@
       tbody.innerHTML = lista.map(item => {
         const rut = item.rut_formateado || item.RUT || item.rut || '—';
         const nombres = `${item.nombres || item.NOMBRES || ''} ${item.apellidos || item.APELLIDOS || ''}`.trim() || 'Sin Nombre';
-        const negocio = item.nombre_comercial || item.NOMBRE_COMERCIAL || item.nombreComercial || 'Emprendimiento';
+        const negocio = item.nombre_comercial || item.nombre_fantasia || item.NOMBRE_COMERCIAL || item.nombreComercial || 'Sin Emprendimiento';
         const rubroText = item.rubro || item.RUBRO || item.ID_RUBRO || 'OTRO';
-        const contacto = item.telefono || item.TELEFONO || item.email || item.EMAIL || '—';
+        const subrubroText = item.subrubro || item.ID_SUBRUBRO || '';
+        const tel = item.telefono || item.TELEFONO || '';
+        const mail = item.email || item.EMAIL || '';
+        const comunaText = item.comuna || 'Santiago';
         const s = item.formalizacion_sii || item.FORMALIZACION_SII || 'SIN_INICIO';
 
         return `
@@ -3596,10 +3599,12 @@
             </td>
             <td class="px-6 py-3.5">
               <div class="font-semibold text-slate-700">${escapeHtml(negocio)}</div>
-              <div class="text-xs text-slate-400">${escapeHtml(rubroText)}</div>
+              <div class="text-xs text-slate-400">${escapeHtml(rubroText)}${subrubroText ? ' · ' + escapeHtml(subrubroText) : ''}</div>
             </td>
             <td class="px-6 py-3.5 text-xs text-slate-600">
-              ${escapeHtml(contacto)}
+              ${tel ? `<div>📞 ${escapeHtml(tel)}</div>` : ''}
+              ${mail ? `<div class="text-[11px] text-slate-500">✉️ ${escapeHtml(mail)}</div>` : ''}
+              <div class="text-[11px] text-slate-400 font-medium">📍 ${escapeHtml(comunaText)}</div>
             </td>
             <td class="px-6 py-3.5">
               <span class="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s === 'SIN_INICIO' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
@@ -4228,8 +4233,18 @@
     if (ctxComunas) {
       if (chartInstComunas) chartInstComunas.destroy();
       const comData = g.comunas || [];
-      const labels = comData.map(c => c.comuna || 'Santiago');
-      const values = comData.map(c => Number(c.cantidad || 0));
+      const mapCom = {};
+      comData.forEach(c => {
+        let n = (c.comuna || 'Santiago').trim();
+        if (/^(santiago(\s+centro)?|stgo\.?|comuna\s+de\s+santiago)$/i.test(n)) {
+          n = 'Santiago';
+        } else {
+          n = n.charAt(0).toUpperCase() + n.slice(1);
+        }
+        mapCom[n] = (mapCom[n] || 0) + Number(c.cantidad || 0);
+      });
+      const labels = Object.keys(mapCom);
+      const values = labels.map(k => mapCom[k]);
 
       chartInstComunas = new Chart(ctxComunas, {
         type: 'doughnut',

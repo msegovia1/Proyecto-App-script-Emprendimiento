@@ -88,3 +88,82 @@ function randomSemilla_(seed) {
     return x / 4294967296;
   };
 }
+
+/**
+ * Normaliza nombres de comunas chilenas a formato Title Case estandarizando 'Santiago'.
+ * Unifica variaciones como 'santiago', 'SANTIAGO', 'Santiago Centro', 'stgo', etc.
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizarComuna_(value) {
+  if (!value || typeof value !== 'string') return 'Santiago';
+  const clean = normalizarTexto_(value).trim();
+  if (!clean) return 'Santiago';
+
+  // Si es Santiago o alguna de sus variantes comunes
+  const santiagoRegex = /^(santiago(\s+centro)?|stgo\.?|comuna\s+de\s+santiago|stgo\s+centro)$/i;
+  if (santiagoRegex.test(clean)) {
+    return 'Santiago';
+  }
+
+  // Diccionario de comunas de la RM con acentuación oficial
+  const comunasRM = {
+    'estacion central': 'Estación Central',
+    'estación central': 'Estación Central',
+    'nunoa': 'Ñuñoa',
+    'ñuñoa': 'Ñuñoa',
+    'conchali': 'Conchalí',
+    'conchalí': 'Conchalí',
+    'maipu': 'Maipú',
+    'maipú': 'Maipú',
+    'penalolen': 'Peñalolén',
+    'peñalolen': 'Peñalolén',
+    'peñalolén': 'Peñalolén',
+    'san joaquin': 'San Joaquín',
+    'san joaquín': 'San Joaquín',
+    'san ramon': 'San Ramón',
+    'san ramón': 'San Ramón',
+    'la reina': 'La Reina',
+    'providencia': 'Providencia',
+    'las condes': 'Las Condes',
+    'vitacura': 'Vitacura',
+    'lo barnechea': 'Lo Barnechea',
+    'recoleta': 'Recoleta',
+    'independencia': 'Independencia',
+    'quinta normal': 'Quinta Normal',
+    'san miguel': 'San Miguel',
+    'macul': 'Macul',
+    'la florida': 'La Florida',
+    'pedro aguirre cerda': 'Pedro Aguirre Cerda',
+    'cerrillos': 'Cerrillos',
+    'lo prado': 'Lo Prado',
+    'pudahuel': 'Pudahuel',
+    'cerro navia': 'Cerro Navia',
+    'renca': 'Renca',
+    'quilicura': 'Quilicura',
+    'huechuraba': 'Huechuraba',
+    'lo espejo': 'Lo Espejo',
+    'la cisterna': 'La Cisterna',
+    'la granja': 'La Granja',
+    'la pintana': 'La Pintana',
+    'el bosque': 'El Bosque',
+    'san bernardo': 'San Bernardo',
+    'puente alto': 'Puente Alto',
+    'pirque': 'Pirque',
+    'san jose de maipo': 'San José de Maipo'
+  };
+
+  const lower = clean.toLowerCase();
+  if (comunasRM[lower]) {
+    return comunasRM[lower];
+  }
+
+  // Capitalizar cada palabra (Title Case)
+  return clean
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); })
+    .join(' ');
+}
+

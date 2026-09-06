@@ -173,3 +173,21 @@ function sanitizarTexto(texto, maxLen = 255) {
   const str = String(texto).trim();
   return str.slice(0, maxLen);
 }
+
+/**
+ * Normaliza nombres de comunas a formato Title Case y estándar oficial Santiago.
+ * @param {string} comuna
+ * @returns {string}
+ */
+function normalizarComuna(comuna) {
+  if (typeof normalizarComuna_ === 'function') {
+    return normalizarComuna_(comuna);
+  }
+  if (!comuna || typeof comuna !== 'string') return 'Santiago';
+  const c = comuna.trim();
+  if (/^(santiago(\s+centro)?|stgo\.?|comuna\s+de\s+santiago)$/i.test(c)) {
+    return 'Santiago';
+  }
+  return c.charAt(0).toUpperCase() + c.slice(1).toLowerCase();
+}
+

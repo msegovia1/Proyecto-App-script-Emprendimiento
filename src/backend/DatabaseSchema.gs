@@ -80,6 +80,19 @@ function obtenerSentenciasDDL() {
     );`,
     `CREATE INDEX IF NOT EXISTS idx_pe_persona ON persona_emprendimiento(id_persona);`,
     `CREATE INDEX IF NOT EXISTS idx_pe_emp ON persona_emprendimiento(id_emprendimiento);`,
+    `CREATE VIEW IF NOT EXISTS vinculaciones AS 
+      SELECT 
+        id_vinculacion, 
+        id_persona, 
+        id_emprendimiento, 
+        rol, 
+        es_titular_principal AS es_contacto_principal, 
+        es_titular_principal, 
+        creado_por, 
+        actualizado_por, 
+        creado_en, 
+        actualizado_en 
+      FROM persona_emprendimiento;`,
 
     // ==========================================
     // 4. DOCUMENTOS (Expediente con Hash SHA-256)
