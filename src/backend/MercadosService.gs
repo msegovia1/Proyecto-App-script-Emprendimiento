@@ -4,9 +4,24 @@
 
 function carpetaMercado_(iniciativa) {
   const raiz = carpetaRoot_();
-  const mercados = carpetaHija_(raiz, 'Mercados');
-  const mercado = carpetaHija_(mercados, nombreSeguroCarpeta_(iniciativa.NOMBRE || 'Mercado'));
-  ['Minuta', 'Gráfica', 'Programación', 'Libreto', 'Fotos de la actividad', 'Listado de emprendimientos asistentes', 'Seleccionados'].forEach(function(nombre) {
+  let mercados = null;
+  const folders = raiz.getFolders();
+  while (folders.hasNext()) {
+    const f = folders.next();
+    const fName = f.getName().trim();
+    if (fName === '02_Convocatorias_y_Mercados' || fName === 'Mercados') {
+      mercados = f;
+      break;
+    }
+  }
+  if (!mercados) {
+    mercados = carpetaHija_(raiz, '02_Convocatorias_y_Mercados');
+  }
+
+  const anioActual = new Date().getFullYear().toString();
+  const carpetaAnio = carpetaHija_(mercados, anioActual);
+  const mercado = carpetaHija_(carpetaAnio, nombreSeguroCarpeta_(iniciativa.NOMBRE || 'Mercado'));
+  ['01_Minuta_y_Bases', '02_Grafica_y_Difusion', '03_Programacion_y_Libreto', '04_Fotos_de_la_Actividad', '05_Asistencia_y_Ventas', '06_Emprendedores_Seleccionados'].forEach(function(nombre) {
     carpetaHija_(mercado, nombre);
   });
   return mercado;

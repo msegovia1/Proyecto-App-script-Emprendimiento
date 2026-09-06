@@ -82,9 +82,22 @@ function formatearRutChileno_(rut) {
 
 function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
   const raiz = driveObtenerCarpetaRaiz_();
+  let carpetaExpedientesRaiz = null;
+  const foldersRaiz = raiz.getFolders();
+  while (foldersRaiz.hasNext()) {
+    const f = foldersRaiz.next();
+    const fName = f.getName().trim();
+    if (fName === '01_Expedientes' || fName === 'Expedientes') {
+      carpetaExpedientesRaiz = f;
+      break;
+    }
+  }
+  if (!carpetaExpedientesRaiz) {
+    carpetaExpedientesRaiz = driveObtenerOCrearSubcarpeta_(raiz, '01_Expedientes');
+  }
+
   const anioActual = new Date().getFullYear().toString();
-  const carpetaAnio = driveObtenerOCrearSubcarpeta_(raiz, anioActual);
-  const carpetaExpedientes = driveObtenerOCrearSubcarpeta_(carpetaAnio, 'Expedientes');
+  const carpetaExpedientes = driveObtenerOCrearSubcarpeta_(carpetaExpedientesRaiz, anioActual);
   
   const rutNormalizado = normalizarRut(rutLimpio) || 'SIN_RUT';
   const info = infoExtra || {};

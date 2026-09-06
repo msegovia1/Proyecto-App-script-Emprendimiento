@@ -483,3 +483,15 @@ function apiConfigurarCarpetaMiUnidadFormulario(payload) {
     return { success: false, data: null, error: 'No se pudo acceder a la carpeta: ' + error.message };
   }
 }
+
+/**
+ * API RPC: Configura y crea la estructura limpia en la Unidad Compartida oficial (DIDEL).
+ */
+function apiConfigurarUnidadCompartida(payload) {
+  try {
+    const fid = (payload && payload.folderId) ? payload.folderId : '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
+    return configurarUnidadCompartidaOficial(fid);
+  } catch (error) {
+    return { success: false, data: null, error: 'Error al configurar Unidad Compartida: ' + error.message };
+  }
+}

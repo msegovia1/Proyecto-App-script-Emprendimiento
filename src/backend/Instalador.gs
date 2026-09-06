@@ -595,6 +595,99 @@ function migrarFormulariosAMiUnidad() {
   });
 }
 
+/**
+ * Configura el ID de la Unidad Compartida oficial (1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm)
+ * y genera la jerarquía completa y limpia de carpetas de primer nivel.
+ * Puede ejecutarse directamente desde el editor de Google Apps Script.
+ * @param {string} [idCarpetaOpcional]
+ */
+function configurarUnidadCompartidaOficial(idCarpetaOpcional) {
+  const folderId = (idCarpetaOpcional || '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm').trim();
+  const folder = DriveApp.getFolderById(folderId);
+  if (!folder) {
+    throw new Error('No se pudo acceder a la carpeta de la Unidad Compartida con ID: ' + folderId);
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperties({
+    DRIVE_ROOT_FOLDER_ID: folderId,
+    SGE_ROOT_FOLDER_ID: folderId
+  });
+
+  const carpetasCreadas = {};
+  const anioActual = new Date().getFullYear().toString();
+
+  // 1. 01_Expedientes
+  let cExp = null;
+  const fRaiz = folder.getFolders();
+  while (fRaiz.hasNext()) {
+    const f = fRaiz.next();
+    if (f.getName() === '01_Expedientes' || f.getName() === 'Expedientes') { cExp = f; break; }
+  }
+  if (!cExp) cExp = folder.createFolder('01_Expedientes');
+  let cExpAnio = null;
+  const fExp = cExp.getFolders();
+  while (fExp.hasNext()) {
+    const f = fExp.next();
+    if (f.getName() === anioActual) { cExpAnio = f; break; }
+  }
+  if (!cExpAnio) cExpAnio = cExp.createFolder(anioActual);
+  carpetasCreadas['01_Expedientes'] = { id: cExp.getId(), url: cExp.getUrl(), subAnio: cExpAnio.getUrl() };
+
+  // 2. 02_Convocatorias_y_Mercados
+  let cMerc = null;
+  const fRaiz2 = folder.getFolders();
+  while (fRaiz2.hasNext()) {
+    const f = fRaiz2.next();
+    if (f.getName() === '02_Convocatorias_y_Mercados' || f.getName() === 'Mercados') { cMerc = f; break; }
+  }
+  if (!cMerc) cMerc = folder.createFolder('02_Convocatorias_y_Mercados');
+  let cMercAnio = null;
+  const fMerc = cMerc.getFolders();
+  while (fMerc.hasNext()) {
+    const f = fMerc.next();
+    if (f.getName() === anioActual) { cMercAnio = f; break; }
+  }
+  if (!cMercAnio) cMercAnio = cMerc.createFolder(anioActual);
+  carpetasCreadas['02_Convocatorias_y_Mercados'] = { id: cMerc.getId(), url: cMerc.getUrl(), subAnio: cMercAnio.getUrl() };
+
+  // 3. 03_Respaldos_y_Consolidados
+  let cResp = null;
+  const fRaiz3 = folder.getFolders();
+  while (fRaiz3.hasNext()) {
+    const f = fRaiz3.next();
+    if (f.getName() === '03_Respaldos_y_Consolidados') { cResp = f; break; }
+  }
+  if (!cResp) cResp = folder.createFolder('03_Respaldos_y_Consolidados');
+  carpetasCreadas['03_Respaldos_y_Consolidados'] = { id: cResp.getId(), url: cResp.getUrl() };
+
+  // 4. 04_Plantillas_Institucionales
+  let cPlan = null;
+  const fRaiz4 = folder.getFolders();
+  while (fRaiz4.hasNext()) {
+    const f = fRaiz4.next();
+    if (f.getName() === '04_Plantillas_Institucionales') { cPlan = f; break; }
+  }
+  if (!cPlan) cPlan = folder.createFolder('04_Plantillas_Institucionales');
+  carpetasCreadas['04_Plantillas_Institucionales'] = { id: cPlan.getId(), url: cPlan.getUrl() };
+
+  Logger.log('=====================================================');
+  Logger.log('✅ UNIDAD COMPARTIDA CONFIGURADA EXITOSAMENTE:');
+  Logger.log('📁 Raíz: ' + folder.getName() + ' (' + folder.getUrl() + ')');
+  Logger.log('🆔 ID: ' + folder.getId());
+  Logger.log('📂 01_Expedientes: ' + cExp.getUrl());
+  Logger.log('📂 02_Convocatorias_y_Mercados: ' + cMerc.getUrl());
+  Logger.log('📂 03_Respaldos_y_Consolidados: ' + cResp.getUrl());
+  Logger.log('📂 04_Plantillas_Institucionales: ' + cPlan.getUrl());
+  Logger.log('=====================================================');
+
+  return respuestaOk({
+    mensaje: 'Unidad Compartida configurada con estructura limpia estándar.',
+    raiz: { id: folder.getId(), nombre: folder.getName(), url: folder.getUrl() },
+    estructura: carpetasCreadas
+  });
+}
+
 function asegurarCamposFormularioRegistro_(form) {
   const titles = form.getItems().map(function(item) { return item.getTitle(); });
   if (titles.indexOf('Fecha de nacimiento') < 0) form.addDateItem().setTitle('Fecha de nacimiento');

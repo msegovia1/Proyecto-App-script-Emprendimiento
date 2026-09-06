@@ -32,7 +32,7 @@ const APP = Object.freeze({
 // Estos identificadores actúan como fallback si PropertiesService aún no ha sido configurado.
 const PREINSTALACION_DRIVE = Object.freeze({
   DB_ID: '14-aP9u5qeh3nabo0ol7LAYHBklqhw-LMLCZlJS7SKVo',
-  ROOT_FOLDER_ID: '185iI1JSNalw00CuVL39EzNPA40KafstO'
+  ROOT_FOLDER_ID: '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm'
 });
 
 /**
