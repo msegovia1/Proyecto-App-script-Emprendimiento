@@ -1269,6 +1269,8 @@ function procesarPostulacionMercadoFormulario(e) {
                       rut: personaData.RUT,
                       tipoDocumento: todosLosArchivos[fid],
                       archivo: fDrive.getBlob(),
+                      nombrePersona: ((personaData.NOMBRES || '') + ' ' + (personaData.APELLIDO_PATERNO || '') + ' ' + (personaData.APELLIDO_MATERNO || '')).trim(),
+                      nombreEmprendimiento: empData.NOMBRE_COMERCIAL || '',
                       usuarioEmail: 'FORMULARIO_MERCADO'
                     });
                     if (resDoc && !resDoc.success) {

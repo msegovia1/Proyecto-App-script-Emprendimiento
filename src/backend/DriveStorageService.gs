@@ -66,13 +66,63 @@ function driveObtenerOCrearSubcarpeta_(padre, nombre) {
   return padre.createFolder(nombre);
 }
 
-function driveObtenerCarpetaEmprendedor_(rutLimpio) {
+function formatearRutChileno_(rut) {
+  if (!rut) return '';
+  const limpio = String(rut).replace(/[^0-9kK]/g, '').toUpperCase();
+  if (limpio.length < 2) return limpio;
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1);
+  return cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv;
+}
+
+function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
   const raiz = driveObtenerCarpetaRaiz_();
   const anioActual = new Date().getFullYear().toString();
   const carpetaAnio = driveObtenerOCrearSubcarpeta_(raiz, anioActual);
   const carpetaExpedientes = driveObtenerOCrearSubcarpeta_(carpetaAnio, 'Expedientes');
+  
   const rutNormalizado = normalizarRut(rutLimpio) || 'SIN_RUT';
-  return driveObtenerOCrearSubcarpeta_(carpetaExpedientes, rutNormalizado);
+  const info = infoExtra || {};
+  const rutFmt = info.rutFormateado || formatearRutChileno_(rutNormalizado) || rutNormalizado;
+  const nomPersona = (info.nombrePersona || '').trim();
+  const nomEmp = (info.nombreEmprendimiento || '').trim();
+
+  // Armar nombre institucional descriptivo:
+  // Ej: "11.111.111-1 - Francisca Paz Morales Ríos - Cerámicas y Diseños Yungay"
+  const partes = [rutFmt];
+  if (nomPersona) partes.push(nomPersona);
+  if (nomEmp && nomEmp.toLowerCase() !== nomPersona.toLowerCase()) partes.push(nomEmp);
+  const nombreObjetivo = partes.join(' - ');
+
+  // Buscar si ya existe una carpeta para este RUT (con nombre sin formato "111111111", formateado o completo)
+  const folders = carpetaExpedientes.getFolders();
+  let carpetaEncontrada = null;
+
+  while (folders.hasNext()) {
+    const f = folders.next();
+    const fName = f.getName().trim();
+    if (fName === rutNormalizado || 
+        fName.startsWith(rutFmt) || 
+        fName.startsWith(rutNormalizado) ||
+        (fName.indexOf(rutNormalizado) >= 0 && (nomPersona || nomEmp))) {
+      carpetaEncontrada = f;
+      break;
+    }
+  }
+
+  if (carpetaEncontrada) {
+    // Si la carpeta existe pero solo tiene el RUT o le faltaban los nombres, renombrarla automáticamente
+    if (carpetaEncontrada.getName() !== nombreObjetivo && (nomPersona || nomEmp)) {
+      try {
+        carpetaEncontrada.setName(nombreObjetivo);
+      } catch (errRename) {
+        Logger.log('Aviso al renombrar carpeta de expediente: ' + errRename.message);
+      }
+    }
+    return carpetaEncontrada;
+  }
+
+  return carpetaExpedientes.createFolder(nombreObjetivo);
 }
 
 /**
@@ -118,13 +168,37 @@ function cargarDocumentoExpediente(params) {
     const sha256 = calcularSha256Bytes_(bytes);
     const tamanoBytes = bytes.length;
 
-    // 3. Buscar persona en Turso
+    // 3. Buscar persona y emprendimiento en Turso
     const qPersona = tursoEjecutar(
-      `SELECT id_persona, rut_formateado FROM personas WHERE rut = ? OR rut_formateado = ? LIMIT 1;`,
+      `SELECT id_persona, rut_formateado, nombres, apellidos FROM personas WHERE rut = ? OR rut_formateado = ? LIMIT 1;`,
       [rutLimpio, params.rut]
     );
     const persona = qPersona.success && qPersona.data.rows && qPersona.data.rows[0];
     const idPersona = persona ? persona.id_persona : null;
+
+    let nombrePersona = params.nombrePersona || '';
+    if (!nombrePersona && persona) {
+      nombrePersona = [persona.nombres, persona.apellidos].filter(Boolean).join(' ').trim();
+    }
+    let rutFormateado = (persona && persona.rut_formateado) || (params.rutFormateado || '');
+    if (!rutFormateado) {
+      rutFormateado = formatearRutChileno_(rutLimpio) || rutLimpio;
+    }
+
+    let nombreEmprendimiento = params.nombreEmprendimiento || '';
+    if (!nombreEmprendimiento && idPersona) {
+      const qEmp = tursoEjecutar(
+        `SELECT e.nombre_comercial, e.nombre_fantasia 
+         FROM emprendimientos e
+         JOIN persona_emprendimiento pe ON pe.id_emprendimiento = e.id_emprendimiento
+         WHERE pe.id_persona = ?
+         LIMIT 1;`,
+        [idPersona]
+      );
+      if (qEmp.success && qEmp.data.rows && qEmp.data.rows[0]) {
+        nombreEmprendimiento = qEmp.data.rows[0].nombre_comercial || qEmp.data.rows[0].nombre_fantasia || '';
+      }
+    }
 
     // 4. Chequeo de duplicidad de bytes exacta en Turso
     const qDuplicado = tursoEjecutar(
@@ -151,7 +225,11 @@ function cargarDocumentoExpediente(params) {
     }
 
     // 5. Subir a Google Drive
-    const carpeta = driveObtenerCarpetaEmprendedor_(rutLimpio);
+    const carpeta = driveObtenerCarpetaEmprendedor_(rutLimpio, {
+      rutFormateado: rutFormateado,
+      nombrePersona: nombrePersona,
+      nombreEmprendimiento: nombreEmprendimiento
+    });
     const extension = originalName.lastIndexOf('.') >= 0 ? originalName.slice(originalName.lastIndexOf('.')) : '.pdf';
     const timestamp = Utilities.formatDate(new Date(), 'America/Santiago', 'yyyyMMdd_HHmmss');
     const nuevoNombre = `${tipo}_${rutLimpio || 'EXP'}_${timestamp}${extension}`;
@@ -293,4 +371,60 @@ function obtenerDocumentosEmprendedor(identificador) {
     return { success: false, data: [], error: err.message || String(err) };
   }
 }
+
+/**
+ * Normaliza y renombra todas las carpetas existentes en Drive/Expedientes para que lleven el formato institucional:
+ * "RUT_FORMATEADO - Nombre Persona - Nombre Emprendimiento"
+ * @returns {{ success: boolean, renombradas: Array, error: string|null }}
+ */
+function driveNormalizarNombresCarpetasExistentes() {
+  try {
+    const raiz = driveObtenerCarpetaRaiz_();
+    const anioActual = new Date().getFullYear().toString();
+    const carpetaAnio = driveObtenerOCrearSubcarpeta_(raiz, anioActual);
+    const carpetaExpedientes = driveObtenerOCrearSubcarpeta_(carpetaAnio, 'Expedientes');
+    const folders = carpetaExpedientes.getFolders();
+    const renombradas = [];
+
+    while (folders.hasNext()) {
+      const folder = folders.next();
+      const currentName = folder.getName().trim();
+      // Extraer secuencia numérica del RUT
+      const matchRut = currentName.match(/(\d{7,8}[0-9kK]?)/);
+      if (matchRut) {
+        const rutLimpio = normalizarRut(matchRut[1]);
+        const qPersona = tursoEjecutar(
+          `SELECT p.rut_formateado, p.nombres, p.apellidos, e.nombre_comercial, e.nombre_fantasia
+           FROM personas p
+           LEFT JOIN persona_emprendimiento pe ON pe.id_persona = p.id_persona
+           LEFT JOIN emprendimientos e ON e.id_emprendimiento = pe.id_emprendimiento
+           WHERE p.rut = ? OR p.rut_formateado = ?
+           LIMIT 1;`,
+          [rutLimpio, rutLimpio]
+        );
+
+        if (qPersona.success && qPersona.data.rows && qPersona.data.rows.length > 0) {
+          const row = qPersona.data.rows[0];
+          const rutFmt = row.rut_formateado || formatearRutChileno_(rutLimpio);
+          const nomPersona = [row.nombres, row.apellidos].filter(Boolean).join(' ').trim();
+          const nomEmp = (row.nombre_comercial || row.nombre_fantasia || '').trim();
+
+          const partes = [rutFmt];
+          if (nomPersona) partes.push(nomPersona);
+          if (nomEmp && nomEmp.toLowerCase() !== nomPersona.toLowerCase()) partes.push(nomEmp);
+          const nuevoNombre = partes.join(' - ');
+
+          if (currentName !== nuevoNombre) {
+            folder.setName(nuevoNombre);
+            renombradas.push({ antes: currentName, despues: nuevoNombre });
+          }
+        }
+      }
+    }
+    return { success: true, renombradas: renombradas, error: null };
+  } catch (e) {
+    return { success: false, renombradas: [], error: e.message || String(e) };
+  }
+}
+
 

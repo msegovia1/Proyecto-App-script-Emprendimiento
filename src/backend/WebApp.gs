@@ -399,9 +399,30 @@ function apiSincronizarFormularioOficial() {
       Logger.log('Aviso en ingesta automática de respuestas: ' + errIngesta.message);
     }
     res.ingesta = ingesta ? ingesta.data : null;
+
+    // Normalizar nombres de carpetas en Google Drive a formato institucional completo
+    try {
+      if (typeof driveNormalizarNombresCarpetasExistentes === 'function') {
+        driveNormalizarNombresCarpetasExistentes();
+      }
+    } catch (errDrive) {
+      Logger.log('Aviso al normalizar nombres de carpetas: ' + errDrive.message);
+    }
+
     return { success: true, data: res, error: null };
   } catch (error) {
     return { success: false, data: null, error: error.message || String(error) };
+  }
+}
+
+/**
+ * API RPC: Normaliza nombres de carpetas en Google Drive para incluir RUT formateado y nombres
+ */
+function apiNormalizarCarpetasDrive() {
+  try {
+    return driveNormalizarNombresCarpetasExistentes();
+  } catch (error) {
+    return { success: false, renombradas: [], error: error.message };
   }
 }
 
