@@ -4612,8 +4612,8 @@
 
     try {
       const res = await call('apiSincronizarFormularioOficial');
-      if (res && res.success && res.data) {
-        let msg = `Formulario oficial sincronizado con ${res.data.totalAbiertas} convocatorias abiertas.`;
+      if (res && (res.success || res.ok) && res.data) {
+        let msg = `Formulario oficial sincronizado con ${res.data.totalAbiertas != null ? res.data.totalAbiertas : 0} convocatorias abiertas.`;
         if (res.data.ingesta && res.data.ingesta.procesadas > 0) {
           msg += ` Se procesaron e ingresaron ${res.data.ingesta.procesadas} postulaciones recibidas.`;
         }
@@ -4624,10 +4624,11 @@
           await window.cargarSelectorIniciativasSeleccion();
         }
       } else {
-        mostrarToast('Error sincronizando formulario: ' + (res ? res.error : 'Sin respuesta'), 'error');
+        const errMsg = (res && (res.error ? (res.error.message || res.error) : null)) || 'Sin respuesta del servidor';
+        mostrarToast('Error sincronizando formulario: ' + errMsg, 'error');
       }
     } catch (err) {
-      mostrarToast('Error al conectar con Google Forms: ' + err.message, 'error');
+      mostrarToast('Error al conectar con Google Forms: ' + (err.message || String(err)), 'error');
     } finally {
       if (btn) {
         btn.innerHTML = originalText;
@@ -4661,7 +4662,12 @@
 
     try {
       const res = await call('apiIniciativasListar', { estado: 'ABIERTA' });
-      const lista = (res && res.success && res.data) ? res.data : [];
+      if (res && (res.error || (!res.success && !res.ok))) {
+        const msg = (res.error ? (res.error.message || res.error) : 'Error desconocido al consultar Turso');
+        contenedor.innerHTML = `<div class="col-span-full py-8 text-center text-amber-600 text-xs">Aviso al cargar iniciativas: ${escapeHtml(msg)}</div>`;
+        return;
+      }
+      const lista = (res && (res.success || res.ok) && res.data) ? res.data : [];
       window.listaIniciativasGlobal = lista;
 
       if (lista.length === 0) {

@@ -409,9 +409,9 @@ function apiSincronizarFormularioOficial() {
       Logger.log('Aviso al normalizar nombres de carpetas: ' + errDrive.message);
     }
 
-    return { success: true, data: res, error: null };
+    return { success: true, ok: true, data: serializarParaCliente_(res), error: null };
   } catch (error) {
-    return { success: false, data: null, error: error.message || String(error) };
+    return { success: false, ok: false, data: null, error: error.message || String(error) };
   }
 }
 

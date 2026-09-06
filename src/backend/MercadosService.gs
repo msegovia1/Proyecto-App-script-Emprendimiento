@@ -1078,7 +1078,7 @@ function procesarPostulacionMercadoFormulario(e) {
   const answers = respuestasFormulario_(e);
   const responseId = e && e.response && e.response.getId ? e.response.getId() : uuid_();
   try {
-    conBloqueoSistema_(function() {
+    return conBloqueoSistema_(function() {
       let idIniciativa = '';
       const selected = answers['Mercado o Convocatoria a la que postula'] ||
                        answers['Mercado o Convocatoria'] ||
@@ -1100,6 +1100,23 @@ function procesarPostulacionMercadoFormulario(e) {
         const formId = e && e.source && e.source.getId ? e.source.getId() : '';
         const map = JSON.parse(PropertiesService.getScriptProperties().getProperty('SGE_FORM_MERCADO_MAP') || '{}');
         idIniciativa = map[formId];
+      }
+      // Fallback resiliente: vincular a la primera iniciativa abierta si no se especifica
+      if (!idIniciativa) {
+        try {
+          if (typeof tursoEjecutar === 'function') {
+            const qIni = tursoEjecutar("SELECT id_iniciativa FROM iniciativas WHERE estado IN ('ABIERTA', 'PUBLICADA') ORDER BY creado_en DESC LIMIT 1;");
+            if (qIni && qIni.success && qIni.data && qIni.data.rows && qIni.data.rows.length > 0) {
+              idIniciativa = qIni.data.rows[0].id_iniciativa;
+            }
+          }
+        } catch (ignored) {}
+      }
+      if (!idIniciativa) {
+        try {
+          const abiertas = repoTodos('INICIATIVAS', { incluirInactivos: false }).filter(function(i) { return i.ESTADO === 'ABIERTA'; });
+          if (abiertas.length > 0) idIniciativa = abiertas[0].ID_INICIATIVA;
+        } catch (ignored) {}
       }
       exigir_(idIniciativa, 'FORMULARIO_NO_CONFIGURADO', 'No se pudo identificar el mercado o convocatoria vinculado a la postulación.');
       const personaData = {
@@ -1445,14 +1462,18 @@ function apiProcesarRespuestasPendientesFormulario() {
         const res = procesarPostulacionMercadoFormulario({ response: resp, source: form });
         resultados.push({
           idRespuesta: resp.getId(),
-          timestamp: resp.getTimestamp(),
+          timestamp: resp.getTimestamp() ? Utilities.formatDate(resp.getTimestamp(), APP.TIMEZONE, "yyyy-MM-dd'T'HH:mm:ssXXX") : ahoraIso_(),
           ok: true,
-          postulacion: res
+          postulacion: res ? {
+            idPostulacion: res.ID_POSTULACION || '',
+            idIniciativa: res.ID_INICIATIVA || '',
+            idEmprendimiento: res.ID_EMPRENDIMIENTO || ''
+          } : null
         });
       } catch (err) {
         resultados.push({
           idRespuesta: resp.getId(),
-          timestamp: resp.getTimestamp(),
+          timestamp: resp.getTimestamp() ? Utilities.formatDate(resp.getTimestamp(), APP.TIMEZONE, "yyyy-MM-dd'T'HH:mm:ssXXX") : ahoraIso_(),
           ok: false,
           error: err.message || String(err)
         });

@@ -471,6 +471,15 @@ function inicializarCatalogosYConfiguracion_() {
  * en bases de datos Turso existentes sin interrumpir la operación.
  */
 function asegurarColumnasExtendidas_() {
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService.getScriptCache) {
+      const cache = CacheService.getScriptCache();
+      if (cache && cache.get('COLUMNAS_EXTENDIDAS_V2_OK')) {
+        return;
+      }
+    }
+  } catch (e) {}
+
   const migraciones = [
     `ALTER TABLE iniciativas ADD COLUMN objetivo TEXT;`,
     `ALTER TABLE iniciativas ADD COLUMN tematica TEXT;`,
@@ -504,4 +513,13 @@ function asegurarColumnasExtendidas_() {
       // Ignora si la columna ya existe en SQLite/Turso
     }
   }
+
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService.getScriptCache) {
+      const cache = CacheService.getScriptCache();
+      if (cache) {
+        cache.put('COLUMNAS_EXTENDIDAS_V2_OK', '1', 21600);
+      }
+    }
+  } catch (e) {}
 }
