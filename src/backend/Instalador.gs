@@ -703,6 +703,27 @@ function configurarUnidadCompartidaOficial(idCarpetaOpcional) {
   });
 }
 
+/**
+ * Crea o sincroniza el Formulario Único Oficial de Postulaciones a Mercados en "Mi Unidad",
+ * vinculándolo a las convocatorias abiertas de Turso y configurando la carga de archivos.
+ * Se puede ejecutar directamente desde el menú superior de Apps Script.
+ */
+function crearOActualizarFormularioOficial() {
+  Logger.log('🚀 Iniciando creación/sincronización del Formulario Oficial de Postulación...');
+  if (typeof sincronizarMercadosEnFormularioUnico_ !== 'function') {
+    throw new Error('No se encontró la función sincronizarMercadosEnFormularioUnico_ en MercadosService.gs');
+  }
+  const resultado = sincronizarMercadosEnFormularioUnico_();
+  Logger.log('=====================================================');
+  Logger.log('✅ FORMULARIO OFICIAL CONFIGURADO EXITOSAMENTE:');
+  Logger.log('🌐 Enlace público para emprendedores: ' + resultado.formUrl);
+  Logger.log('✏️ Enlace de edición para funcionarios: ' + resultado.editUrl);
+  Logger.log('📁 Carpeta buzón en Mi Unidad: ' + resultado.carpetaDriveUrl);
+  Logger.log('🎪 Convocatorias sincronizadas: ' + resultado.totalAbiertas + ' (' + resultado.mercados.join(', ') + ')');
+  Logger.log('=====================================================');
+  return resultado;
+}
+
 function asegurarCamposFormularioRegistro_(form) {
   const titles = form.getItems().map(function(item) { return item.getTitle(); });
   if (titles.indexOf('Fecha de nacimiento') < 0) form.addDateItem().setTitle('Fecha de nacimiento');
