@@ -602,10 +602,25 @@ function migrarFormulariosAMiUnidad() {
  * @param {string} [idCarpetaOpcional]
  */
 function configurarUnidadCompartidaOficial(idCarpetaOpcional) {
+  const emailActual = (typeof Session !== 'undefined' && Session.getActiveUser) 
+    ? (Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail()) 
+    : 'usuario';
+  Logger.log('👤 Usuario ejecutando el script: ' + emailActual);
+
   const folderId = (idCarpetaOpcional || '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm').trim();
-  const folder = DriveApp.getFolderById(folderId);
-  if (!folder) {
-    throw new Error('No se pudo acceder a la carpeta de la Unidad Compartida con ID: ' + folderId);
+  let folder = null;
+  try {
+    folder = DriveApp.getFolderById(folderId);
+  } catch (err) {
+    Logger.log('❌ No se pudo acceder directamente al ID: ' + folderId);
+    Logger.log('💡 CAUSA TÉCNICA EN GOOGLE APPS SCRIPT:');
+    Logger.log('Si el ID corresponde a la RAÍZ de la Unidad Compartida (Team Drive), DriveApp no permite manipularla como carpeta normal por políticas de Google Workspace.');
+    Logger.log('PASOS PARA RESOLVER:');
+    Logger.log('1. Abre tu Unidad Compartida: https://drive.google.com/drive/folders/' + folderId);
+    Logger.log('2. Haz clic en "Nuevo" > "Nueva carpeta" y nómbrala: DIDEL - Sistema de Gestión de Emprendimientos');
+    Logger.log('3. Abre esa carpeta recién creada y copia el nuevo ID que aparece al final de la URL.');
+    Logger.log('4. Ejecuta: configurarUnidadCompartidaOficial("EL_NUEVO_ID")');
+    throw new Error('No se pudo acceder al ID [' + folderId + ']. Si es la raíz de la Unidad Compartida, crea una carpeta dentro (ej: "DIDEL - Sistema de Gestión de Emprendimientos") y ejecuta la función pasando el ID de esa subcarpeta.');
   }
 
   const props = PropertiesService.getScriptProperties();
