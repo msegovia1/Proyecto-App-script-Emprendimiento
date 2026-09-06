@@ -3434,7 +3434,43 @@
     }, 4500);
   };
 
+  // Control de Menú Móvil / Drawer
+  window.toggleSidebar = function() {
+    const sidebar = document.getElementById('appSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (!sidebar) return;
+    const isClosed = sidebar.classList.contains('-translate-x-full');
+    if (isClosed) {
+      sidebar.classList.remove('-translate-x-full');
+      if (backdrop) {
+        backdrop.classList.remove('opacity-0', 'pointer-events-none');
+        backdrop.classList.add('opacity-100', 'pointer-events-auto');
+      }
+    } else {
+      sidebar.classList.add('-translate-x-full');
+      if (backdrop) {
+        backdrop.classList.add('opacity-0', 'pointer-events-none');
+        backdrop.classList.remove('opacity-100', 'pointer-events-auto');
+      }
+    }
+  };
+
+  window.cerrarSidebar = function() {
+    const sidebar = document.getElementById('appSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.add('-translate-x-full');
+    if (backdrop) {
+      backdrop.classList.add('opacity-0', 'pointer-events-none');
+      backdrop.classList.remove('opacity-100', 'pointer-events-auto');
+    }
+  };
+
   window.cambiarSeccion = function(seccion) {
+    // Cerrar drawer en pantallas pequeñas al navegar
+    if (window.innerWidth < 768) {
+      cerrarSidebar();
+    }
+
     const secciones = ['dashboard', 'fichas', 'nuevo', 'iniciativas', 'seleccion', 'seguimiento', 'expediente', 'turso'];
     secciones.forEach(s => {
       const el = document.getElementById('view' + s.charAt(0).toUpperCase() + s.slice(1));
@@ -3443,6 +3479,21 @@
       if (btn) {
         btn.classList.remove('bg-muni-700', 'text-white', 'font-semibold');
         btn.classList.add('text-blue-100');
+      }
+    });
+
+    // Actualizar botones de navegación inferior móvil
+    const bottomNavs = ['dashboard', 'fichas', 'nuevo', 'iniciativas', 'seleccion'];
+    bottomNavs.forEach(b => {
+      const bBtn = document.getElementById('bottomNav' + b.charAt(0).toUpperCase() + b.slice(1));
+      if (bBtn) {
+        if (b === seccion) {
+          bBtn.classList.remove('text-slate-500');
+          bBtn.classList.add('text-muni-700', 'font-bold');
+        } else {
+          bBtn.classList.add('text-slate-500');
+          bBtn.classList.remove('text-muni-700', 'font-bold');
+        }
       }
     });
 

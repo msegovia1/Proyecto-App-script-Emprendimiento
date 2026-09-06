@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node server.js",
     "build": "node build.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "lint": "node -c server.js && node -c build.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
