@@ -285,6 +285,11 @@ function apiDashboardConsolidado() {
  */
 function apiListarPostulacionesMercado(idIniciativa) {
   try {
+    try {
+      if (typeof apiProcesarRespuestasPendientesFormulario === 'function') {
+        apiProcesarRespuestasPendientesFormulario();
+      }
+    } catch (ignored) {}
     return obtenerPostulacionesMercado(idIniciativa);
   } catch (error) {
     return { success: false, data: null, error: error.message };
@@ -372,8 +377,11 @@ function apiObtenerResumenVentasPorDia(idIniciativa) {
   } catch (error) {
     return { success: false, data: null, error: error.message };
   }
-}/**
- * API RPC: Sincroniza las convocatorias abiertas en el Formulario Único Oficial de Postulaciones (en Mi Unidad).
+}
+
+/**
+ * API RPC: Sincroniza las convocatorias abiertas en el Formulario Único Oficial de Postulaciones (en Mi Unidad)
+ * y procesa automáticamente cualquier postulación pendiente para sincronizarla en Turso y Drive.
  */
 function apiSincronizarFormularioOficial() {
   try {
@@ -381,11 +389,29 @@ function apiSincronizarFormularioOficial() {
     if (!res) {
       return { success: false, data: null, error: 'No se pudo inicializar o sincronizar el formulario único.' };
     }
+    // Ingesta automática de postulaciones pendientes o existentes
+    let ingesta = null;
+    try {
+      if (typeof apiProcesarRespuestasPendientesFormulario === 'function') {
+        ingesta = apiProcesarRespuestasPendientesFormulario();
+      }
+    } catch (errIngesta) {
+      Logger.log('Aviso en ingesta automática de respuestas: ' + errIngesta.message);
+    }
+    res.ingesta = ingesta ? ingesta.data : null;
     return { success: true, data: res, error: null };
   } catch (error) {
     return { success: false, data: null, error: error.message || String(error) };
   }
 }
+
+/**
+ * API RPC: Procesa manualmente respuestas pendientes del formulario oficial
+ */
+function apiProcesarRespuestasPendientes() {
+  return apiProcesarRespuestasPendientesFormulario();
+}
+
 
 /**
  * API RPC: Consulta el estado del Formulario Único Oficial de Postulaciones y su carpeta en Mi Unidad.

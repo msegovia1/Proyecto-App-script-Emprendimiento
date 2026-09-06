@@ -669,11 +669,84 @@ function actualizarFormulariosMercadoV205() {
 }
 
 const DOCUMENTOS_FORMULARIO_REGISTRO = Object.freeze([
-  { titulo: 'Cédula por ambos lados (único archivo)', aliases: ['Cédula de identidad por ambos lados (único archivo)', 'Cedula por ambos lados unico archivo'], tipoSujeto: 'PERSONA', tipoDocumento: 'CEDULA_IDENTIDAD_COMPLETA' },
-  { titulo: 'Registro Social de Hogares', tipoSujeto: 'PERSONA', tipoDocumento: 'REGISTRO_SOCIAL_HOGARES' },
-  { titulo: 'Credencial de discapacidad o pensión de invalidez', tipoSujeto: 'PERSONA', tipoDocumento: 'ACREDITACION_DISCAPACIDAD' },
-  { titulo: 'Certificado inicio de actividades', aliases: ['Certificado de inicio de actividades'], tipoSujeto: 'EMPRENDIMIENTO', tipoDocumento: 'INICIO_ACTIVIDADES' },
-  { titulo: 'Ficha técnica de productos o servicios', tipoSujeto: 'EMPRENDIMIENTO', tipoDocumento: 'FICHA_TECNICA_PRODUCTOS' }
+  {
+    titulo: 'Cédula por ambos lados (único archivo)',
+    aliases: [
+      'Cédula de identidad por ambos lados (único archivo)',
+      'Cedula por ambos lados unico archivo',
+      'Cédula de identidad',
+      'Cedula de identidad',
+      'Cédula',
+      'Cedula',
+      'Carnet de identidad',
+      'Carnet',
+      'Documento de identidad',
+      'Cédula de Identidad (ambos lados)',
+      'Cédula por ambos lados',
+      'Cedula por ambos lados',
+      'Cédula de identidad anverso y reverso',
+      'Fotocopia cédula de identidad',
+      'Foto cédula'
+    ],
+    tipoSujeto: 'PERSONA',
+    tipoDocumento: 'CEDULA_IDENTIDAD_COMPLETA'
+  },
+  {
+    titulo: 'Registro Social de Hogares',
+    aliases: [
+      'RSH',
+      'Cartola RSH',
+      'Registro Social',
+      'Cartola Registro Social de Hogares',
+      'Certificado RSH',
+      'Registro social de hogares'
+    ],
+    tipoSujeto: 'PERSONA',
+    tipoDocumento: 'REGISTRO_SOCIAL_HOGARES'
+  },
+  {
+    titulo: 'Credencial de discapacidad o pensión de invalidez',
+    aliases: [
+      'Credencial de discapacidad',
+      'Discapacidad',
+      'Pensión de invalidez',
+      'Carnet de discapacidad',
+      'Certificado discapacidad',
+      'Acreditación discapacidad'
+    ],
+    tipoSujeto: 'PERSONA',
+    tipoDocumento: 'ACREDITACION_DISCAPACIDAD'
+  },
+  {
+    titulo: 'Certificado inicio de actividades',
+    aliases: [
+      'Certificado de inicio de actividades',
+      'Inicio de actividades',
+      'Iniciación de actividades',
+      'SII',
+      'Certificado SII',
+      'Patente comercial',
+      'Patente',
+      'Inicio actividades SII'
+    ],
+    tipoSujeto: 'EMPRENDIMIENTO',
+    tipoDocumento: 'INICIO_ACTIVIDADES'
+  },
+  {
+    titulo: 'Ficha técnica de productos o servicios',
+    aliases: [
+      'Ficha técnica',
+      'Fotos de productos',
+      'Fotos de productos o servicios',
+      'Fotos del producto',
+      'Fotos',
+      'Fotografías',
+      'Muestra de productos',
+      'Fotos productos'
+    ],
+    tipoSujeto: 'EMPRENDIMIENTO',
+    tipoDocumento: 'FICHA_TECNICA_PRODUCTOS'
+  }
 ]);
 
 function normalizarTituloFormulario_(value) {
@@ -765,9 +838,13 @@ function registrarDocumentoFormularioPublico_(tipoSujeto, idSujeto, tipoDocument
 
 function procesarDocumentosFormularioRegistro_(answers, persona, emp, recibido) {
   const resultado = [];
+  const procesadosIds = {};
+
+  // 1. Procesamiento por catálogo estándar y alias
   DOCUMENTOS_FORMULARIO_REGISTRO.forEach(function(config) {
     const ids = idsArchivosRespuestaFormulario_(respuestaDocumentoFormulario_(answers, config));
     ids.forEach(function(id) {
+      procesadosIds[id] = true;
       try {
         const guardado = registrarDocumentoFormularioPublico_(
           config.tipoSujeto,
@@ -782,6 +859,37 @@ function procesarDocumentosFormularioRegistro_(answers, persona, emp, recibido) 
       }
     });
   });
+
+  // 2. Detección universal para preguntas personalizadas con archivos adjuntos
+  Object.keys(answers || {}).forEach(function(tituloPregunta) {
+    const ids = idsArchivosRespuestaFormulario_(answers[tituloPregunta]);
+    ids.forEach(function(id) {
+      if (procesadosIds[id]) return;
+      procesadosIds[id] = true;
+      const t = normalizarTituloFormulario_(tituloPregunta);
+      let tipoDoc = 'DOCUMENTO_POSTULACION';
+      if (t.includes('cedula') || t.includes('identidad') || t.includes('carnet')) tipoDoc = 'CEDULA_IDENTIDAD_COMPLETA';
+      else if (t.includes('rsh') || t.includes('hogar') || t.includes('social')) tipoDoc = 'REGISTRO_SOCIAL_HOGARES';
+      else if (t.includes('discapacid') || t.includes('invalide') || t.includes('credencial')) tipoDoc = 'ACREDITACION_DISCAPACIDAD';
+      else if (t.includes('inicio') || t.includes('actividad') || t.includes('sii') || t.includes('patente')) tipoDoc = 'INICIO_ACTIVIDADES';
+      else if (t.includes('ficha') || t.includes('producto') || t.includes('servicio') || t.includes('foto') || t.includes('muestra')) tipoDoc = 'FICHA_TECNICA_PRODUCTOS';
+
+      const tipoSujeto = (tipoDoc === 'INICIO_ACTIVIDADES' || tipoDoc === 'FICHA_TECNICA_PRODUCTOS') ? 'EMPRENDIMIENTO' : 'PERSONA';
+      try {
+        const guardado = registrarDocumentoFormularioPublico_(
+          tipoSujeto,
+          tipoSujeto === 'PERSONA' ? persona.ID_PERSONA : emp.ID_EMPRENDIMIENTO,
+          tipoDoc,
+          id,
+          recibido
+        );
+        resultado.push(tipoDoc + ' [automático]' + (guardado.reutilizado ? ' (ya registrado)' : ''));
+      } catch (error) {
+        resultado.push(tipoDoc + ' (no procesado: ' + error.message + ')');
+      }
+    });
+  });
+
   return resultado;
 }
 

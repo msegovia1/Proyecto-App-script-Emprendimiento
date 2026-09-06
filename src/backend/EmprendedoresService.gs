@@ -69,6 +69,7 @@ function guardarFichaEmprendedor(payload) {
         idPersona = checkPersona.data.rows[0].id_persona;
       }
     }
+    const existePersona = !!idPersona;
 
     const stmts = [];
 
@@ -461,86 +462,3 @@ function listarFichasEmprendedores(filtros = {}) {
   }
 }
 
-/**
- * Carga un documento físico en Google Drive y lo registra en la tabla 'documentos' de Turso.
- * @param {object} params
- * @param {string} params.idPersona
- * @param {string} params.rut
- * @param {string} params.tipoDocumento
- * @param {GoogleAppsScript.Base.Blob|object} params.archivo
- * @param {string} [params.fechaEmision]
- * @param {string} [params.fechaVencimiento]
- * @param {string} [params.observaciones]
- * @param {string} [params.usuarioEmail]
- * @returns {{ success: boolean, data: object|null, error: string|null }}
- */
-function cargarDocumentoExpediente(params) {
-  try {
-    if (!params || !params.archivo || !params.tipoDocumento) {
-      return { success: false, data: null, error: 'Se requiere archivo y tipo de documento.' };
-    }
-
-    // 1. Guardar en Google Drive
-    const resDrive = driveGuardarDocumento({
-      rut: params.rut,
-      tipoDocumento: params.tipoDocumento,
-      archivo: params.archivo
-    });
-
-    if (!resDrive.success) {
-      return { success: false, data: null, error: resDrive.error };
-    }
-
-    const driveInfo = resDrive.data;
-    const idDoc = 'doc-' + generarUuid_();
-
-    // 2. Registrar en Turso
-    const sql = `
-      INSERT INTO documentos (
-        id_documento, id_persona, id_emprendimiento, tipo_documento,
-        drive_file_id, drive_url, nombre_archivo, mime_type, tamano_bytes,
-        fecha_emision, fecha_vencimiento, estado_revision, observaciones,
-        es_version_vigente, subido_por
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECIBIDO', ?, 1, ?)
-    `;
-
-    const args = [
-      idDoc,
-      params.idPersona || null,
-      params.idEmprendimiento || null,
-      params.tipoDocumento,
-      driveInfo.fileId,
-      driveInfo.fileUrl,
-      driveInfo.fileName,
-      driveInfo.mimeType,
-      driveInfo.sizeBytes,
-      params.fechaEmision || null,
-      params.fechaVencimiento || null,
-      params.observaciones || '',
-      params.usuarioEmail || 'sistema@santiago.cl'
-    ];
-
-    const q = tursoEjecutar(sql, args);
-    if (!q.success) {
-      return { success: false, data: null, error: 'Error al registrar documento en base de datos: ' + q.error };
-    }
-
-    return {
-      success: true,
-      data: {
-        idDocumento: idDoc,
-        driveUrl: driveInfo.fileUrl,
-        nombreArchivo: driveInfo.fileName,
-        tipoDocumento: params.tipoDocumento,
-        mensaje: 'Documento almacenado exitosamente en Google Drive y registrado en Turso.'
-      },
-      error: null
-    };
-  } catch (err) {
-    return {
-      success: false,
-      data: null,
-      error: 'Error al cargar documento: ' + (err.message || String(err))
-    };
-  }
-}

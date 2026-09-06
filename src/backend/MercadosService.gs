@@ -1233,27 +1233,54 @@ function procesarPostulacionMercadoFormulario(e) {
               }
 
               // 3. Procesar documentos cargados: mover a carpetas organizadas y registrar en Turso
+              const todosLosArchivos = {};
               if (typeof DOCUMENTOS_FORMULARIO_REGISTRO !== 'undefined') {
                 DOCUMENTOS_FORMULARIO_REGISTRO.forEach(function(config) {
                   const rawAns = respuestaDocumentoFormulario_(answers, config);
                   const fileIds = idsArchivosRespuestaFormulario_(rawAns);
                   fileIds.forEach(function(fid) {
-                    try {
-                      const fDrive = DriveApp.getFileById(fid);
-                      if (typeof cargarDocumentoExpediente === 'function') {
-                        cargarDocumentoExpediente({
-                          rut: personaData.RUT,
-                          tipoDocumento: config.tipoDocumento || 'OTRO',
-                          archivo: fDrive.getBlob(),
-                          usuarioEmail: 'FORMULARIO_MERCADO'
-                        });
-                      }
-                    } catch (errDoc) {
-                      Logger.log('Aviso al procesar documento para Turso: ' + errDoc.message);
-                    }
+                    todosLosArchivos[fid] = config.tipoDocumento || 'CEDULA_IDENTIDAD_COMPLETA';
                   });
                 });
               }
+
+              // También detectar archivos en cualquier otra pregunta con upload
+              Object.keys(answers || {}).forEach(function(tituloPregunta) {
+                const ids = idsArchivosRespuestaFormulario_(answers[tituloPregunta]);
+                ids.forEach(function(fid) {
+                  if (!todosLosArchivos[fid]) {
+                    const t = String(tituloPregunta).toLowerCase();
+                    let td = 'DOCUMENTO_POSTULACION';
+                    if (t.includes('cedula') || t.includes('cédula') || t.includes('identidad') || t.includes('carnet')) td = 'CEDULA_IDENTIDAD_COMPLETA';
+                    else if (t.includes('rsh') || t.includes('hogar') || t.includes('social')) td = 'REGISTRO_SOCIAL_HOGARES';
+                    else if (t.includes('discapacidad') || t.includes('invalidez')) td = 'ACREDITACION_DISCAPACIDAD';
+                    else if (t.includes('inicio') || t.includes('actividad') || t.includes('sii') || t.includes('patente')) td = 'INICIO_ACTIVIDADES';
+                    else if (t.includes('ficha') || t.includes('producto') || t.includes('servicio') || t.includes('foto')) td = 'FICHA_TECNICA_PRODUCTOS';
+                    todosLosArchivos[fid] = td;
+                  }
+                });
+              });
+
+              Object.keys(todosLosArchivos).forEach(function(fid) {
+                try {
+                  const fDrive = DriveApp.getFileById(fid);
+                  if (typeof cargarDocumentoExpediente === 'function') {
+                    const resDoc = cargarDocumentoExpediente({
+                      rut: personaData.RUT,
+                      tipoDocumento: todosLosArchivos[fid],
+                      archivo: fDrive.getBlob(),
+                      usuarioEmail: 'FORMULARIO_MERCADO'
+                    });
+                    if (resDoc && !resDoc.success) {
+                      Logger.log('Aviso cargarDocumentoExpediente: ' + resDoc.error);
+                    }
+                  }
+                } catch (errDoc) {
+                  Logger.log('Aviso al procesar documento para Turso: ' + errDoc.message);
+                }
+              });
+            } else {
+              Logger.log('Aviso: guardarFichaEmprendedor no tuvo éxito: ' + (tursoFicha ? tursoFicha.error : 'Sin datos'));
             }
           }
         }
@@ -1364,5 +1391,63 @@ function apiLimpiarActivadoresMercados() {
     return respuestaOk(limpiarActivadoresHuerfanosMercados_());
   } catch (error) {
     return manejarError_(error, 'apiLimpiarActivadoresMercados');
+  }
+}
+
+/**
+ * API RPC: Lee todas las respuestas históricas o pendientes enviadas al Formulario Oficial
+ * y las procesa asegurando su persistencia en Turso, Google Sheets y Google Drive.
+ */
+function apiProcesarRespuestasPendientesFormulario() {
+  try {
+    const form = obtenerOCrearFormularioUnicoMercados_();
+    if (!form) {
+      return { success: false, data: null, error: 'No se encontró el formulario único oficial.' };
+    }
+
+    const responses = form.getResponses();
+    if (!responses || responses.length === 0) {
+      return {
+        success: true,
+        data: { total: 0, procesadas: 0, mensaje: 'El formulario aún no contiene respuestas.' },
+        error: null
+      };
+    }
+
+    const resultados = [];
+    for (let i = 0; i < responses.length; i++) {
+      const resp = responses[i];
+      try {
+        const res = procesarPostulacionMercadoFormulario({ response: resp, source: form });
+        resultados.push({
+          idRespuesta: resp.getId(),
+          timestamp: resp.getTimestamp(),
+          ok: true,
+          postulacion: res
+        });
+      } catch (err) {
+        resultados.push({
+          idRespuesta: resp.getId(),
+          timestamp: resp.getTimestamp(),
+          ok: false,
+          error: err.message || String(err)
+        });
+      }
+    }
+
+    const exitosas = resultados.filter(function(r) { return r.ok; }).length;
+    return {
+      success: true,
+      data: {
+        total: responses.length,
+        procesadas: exitosas,
+        fallidas: resultados.length - exitosas,
+        mensaje: `Se procesaron exitosamente ${exitosas} de ${responses.length} respuestas enviadas.`,
+        detalle: resultados
+      },
+      error: null
+    };
+  } catch (error) {
+    return { success: false, data: null, error: error.message || String(error) };
   }
 }

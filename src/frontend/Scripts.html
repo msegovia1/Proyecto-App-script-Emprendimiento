@@ -4550,9 +4550,16 @@
     try {
       const res = await call('apiSincronizarFormularioOficial');
       if (res && res.success && res.data) {
-        mostrarToast(`Formulario oficial sincronizado con ${res.data.totalAbiertas} convocatorias abiertas.`, 'success');
+        let msg = `Formulario oficial sincronizado con ${res.data.totalAbiertas} convocatorias abiertas.`;
+        if (res.data.ingesta && res.data.ingesta.procesadas > 0) {
+          msg += ` Se procesaron e ingresaron ${res.data.ingesta.procesadas} postulaciones recibidas.`;
+        }
+        mostrarToast(msg, 'success');
         await window.cargarEstadoFormularioOficial();
         await window.cargarIniciativas();
+        if (typeof window.cargarSelectorIniciativasSeleccion === 'function') {
+          await window.cargarSelectorIniciativasSeleccion();
+        }
       } else {
         mostrarToast('Error sincronizando formulario: ' + (res ? res.error : 'Sin respuesta'), 'error');
       }
