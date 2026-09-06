@@ -24,9 +24,16 @@ function db_() {
  */
 function carpetaRoot_() {
   const props = PropertiesService.getScriptProperties();
-  const id = (props ? props.getProperty(APP.PROP_ROOT_FOLDER_ID) : null) || PREINSTALACION_DRIVE.ROOT_FOLDER_ID;
-  exigir_(id, 'NO_INSTALADO', 'No existe carpeta documental configurada.');
-  return DriveApp.getFolderById(id);
+  const id = (props ? (props.getProperty('DRIVE_ROOT_FOLDER_ID') || props.getProperty(APP.PROP_ROOT_FOLDER_ID)) : null) || PREINSTALACION_DRIVE.ROOT_FOLDER_ID;
+  if (id) {
+    try {
+      return DriveApp.getFolderById(id);
+    } catch (e) {}
+  }
+  if (typeof driveObtenerCarpetaRaiz_ === 'function') {
+    return driveObtenerCarpetaRaiz_();
+  }
+  return DriveApp.getRootFolder();
 }
 
 /**

@@ -40,7 +40,12 @@ function driveObtenerCarpetaRaiz_() {
   let folderId = '';
   try {
     if (typeof PropertiesService !== 'undefined' && PropertiesService.getScriptProperties) {
-      folderId = PropertiesService.getScriptProperties().getProperty('DRIVE_ROOT_FOLDER_ID') || '';
+      const props = PropertiesService.getScriptProperties();
+      folderId = props.getProperty('DRIVE_ROOT_FOLDER_ID') || 
+                 props.getProperty('SGE_ROOT_FOLDER_ID') || '';
+    }
+    if (!folderId && typeof PREINSTALACION_DRIVE !== 'undefined' && PREINSTALACION_DRIVE.ROOT_FOLDER_ID) {
+      folderId = PREINSTALACION_DRIVE.ROOT_FOLDER_ID;
     }
   } catch (e) {}
 
@@ -50,7 +55,7 @@ function driveObtenerCarpetaRaiz_() {
     } catch (e) {}
   }
 
-  const nombreCarpeta = 'SGE_Municipalidad_Santiago';
+  const nombreCarpeta = 'DIDEL - Sistema de Gestión de Emprendimientos';
   const folders = DriveApp.getFoldersByName(nombreCarpeta);
   if (folders.hasNext()) {
     return folders.next();
