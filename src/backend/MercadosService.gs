@@ -842,7 +842,7 @@ function obtenerOCrearFormularioUnicoMercados_() {
   if (!form) {
     form = FormApp.create('Postulación a Mercados y Convocatorias - Municipalidad de Santiago');
     form.setDescription('Formulario oficial para postular a ferias, mercados y convocatorias de emprendimiento de la Municipalidad de Santiago. Si ya está registrado en el SGE, ingrese su RUT y se mantendrán sus antecedentes actualizados.');
-    form.setConfirmationMessage('Postulación recibida exitosamente. El equipo municipal de Fomento Productivo revisará los antecedentes según las bases de la convocatoria.');
+    form.setConfirmationMessage('Postulación recibida exitosamente. La Dirección de Desarrollo Económico Local revisará los antecedentes según las bases de la convocatoria.');
     asegurarCamposBaseFormularioMercado_(form);
     
     try {

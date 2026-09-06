@@ -796,8 +796,8 @@ function seedInitialData(ctx) {
       CUPOS_TITULARES: 25,
       CUPOS_SUPLENTES: 10,
       ESTADO: 'ABIERTA',
-      RESPONSABLE: 'Coordinación Fomento Productivo',
-      ENTIDAD_ORGANIZADORA: 'Subdirección de Desarrollo Económico Local',
+      RESPONSABLE: 'Dirección de Desarrollo Económico Local',
+      ENTIDAD_ORGANIZADORA: 'Dirección de Desarrollo Económico Local',
       CREADO_EN: hoyIso,
       CREADO_POR: 'admin@santiago.cl'
     },
@@ -834,8 +834,8 @@ function seedInitialData(ctx) {
       CUPOS_TITULARES: 15,
       CUPOS_SUPLENTES: 5,
       ESTADO: 'FINALIZADA',
-      RESPONSABLE: 'Fomento Productivo',
-      ENTIDAD_ORGANIZADORA: 'Municipalidad de Santiago',
+      RESPONSABLE: 'Dirección de Desarrollo Económico Local',
+      ENTIDAD_ORGANIZADORA: 'Dirección de Desarrollo Económico Local',
       CREADO_EN: hoyIso,
       CREADO_POR: 'admin@santiago.cl'
     }
