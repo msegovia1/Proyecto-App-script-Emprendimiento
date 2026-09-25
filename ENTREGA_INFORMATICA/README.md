@@ -28,6 +28,7 @@ A requerimiento expreso del equipo municipal y las directrices de seguridad de l
 | **[02_FLUJOGRAMA_PROCESO_FUNCIONARIOS.md](./02_FLUJOGRAMA_PROCESO_FUNCIONARIOS.md)** | Flujogramas detallados (Mermaid) del flujo operativo de los funcionarios municipales: desde la convocatoria hasta el seguimiento de ventas en terreno. |
 | **[03_FLUJOGRAMA_CICLO_DE_VIDA_DATOS.md](./03_FLUJOGRAMA_CICLO_DE_VIDA_DATOS.md)** | Diagramas de flujo y arquitectura de datos (Mermaid): canalización de ingesta, normalización, almacenamiento relacional, deduplicación SHA-256 en Drive y pistas de auditoría. |
 | **[04_MANUAL_DESPLIEGUE_Y_PERMISOS.md](./04_MANUAL_DESPLIEGUE_Y_PERMISOS.md)** | Guía técnica de instalación paso a paso, estructura de Unidades Compartidas en Google Drive, configuración de manifiesto `appsscript.json`, scopes OAuth y publicación de la Web App. |
+| **[05_ESPECIFICACION_FUNCIONAL_Y_ALCANCE_DEL_SISTEMA.md](./05_ESPECIFICACION_FUNCIONAL_Y_ALCANCE_DEL_SISTEMA.md)** | **Especificación funcional del sistema:** qué funciones realiza, qué módulos debe contener obligatoriamente y qué problemas resuelve en la gestión municipal. |
 
 ---
 
