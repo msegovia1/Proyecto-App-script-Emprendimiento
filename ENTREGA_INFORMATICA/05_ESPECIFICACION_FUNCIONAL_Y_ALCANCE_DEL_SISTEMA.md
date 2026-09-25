@@ -172,3 +172,111 @@ El sistema se compone de **9 módulos funcionales integrados**:
 | **RN-03: Auditoría del Azar** | Todo sorteo debe almacenar su semilla criptográfica en base de datos. | Transparencia ante auditorías externas y concejales. |
 | **RN-04: Cero Desperdicio** | Todo cupo desistido debe ofrecerse al primer lugar de la lista de espera. | Uso óptimo de los recursos e inversión municipal en toldos y seguridad. |
 | **RN-05: Soberanía de Datos** | La información reside 100% en Google Workspace sin egreso a terceros. | Cumplimiento de la Ley 19.628 de Protección de Datos Personales. |
+
+---
+
+## 5. Flujogramas Departamentales: Funcionamiento y Procesamiento de Datos
+
+### 5.1 Flujograma de Funcionamiento Operativo del Departamento (Roles y Gestión Inter-áreas)
+
+Este diagrama ilustra cómo colaboran operativamente los distintos actores del Departamento de Fomento Productivo con la Dirección de Informática, la Alcaldía y la ciudadanía durante el ciclo completo de una feria:
+
+```mermaid
+flowchart TD
+    subgraph CIUDADANIA ["1. CIUDADANÍA"]
+        C_POST["Emprendedor(a) Comunal<br/>- Postula a feria en línea<br/>- Adjunta RSH, SII, SEREMI y fotos<br/>- Confirma o desiste de cupo"]
+    end
+
+    subgraph DEPARTAMENTO ["2. DEPARTAMENTO DE FOMENTO PRODUCTIVO (DIDECO)"]
+        D_COORD["Jefatura / Coordinador(a) de Emprendimiento<br/>- Configura feria, cupos y requisitos<br/>- Monitorea prefiltro automático<br/>- Ejecuta Sorteo LCG con semilla auditable<br/>- Publica decretos y actas oficiales"]
+        D_EVAL["Equipo Evaluador / Asistentes Técnicos<br/>- Valida vigencia de cartolas en Drive<br/>- Revisa resoluciones sanitarias<br/>- Dictamina ADMISIBLE / INADMISIBLE con fundamento"]
+        D_TERR["Inspectores y Monitores en Terreno<br/>- Habilitan y recepcionan stands<br/>- Pasan lista móvil al inicio del día<br/>- Digitan ventas diarias reportadas<br/>- Califican conducta y cumplimiento"]
+    end
+
+    subgraph DIRECCION_INFORMATICA ["3. DIRECCIÓN DE INFORMÁTICA (TI)"]
+        TI_ADMIN["Administrador Google Workspace<br/>- Gestiona accesos y roles institucionales (@muni.cl)<br/>- Resguarda la base relacional en Google Sheets<br/>- Supervisa políticas de no egreso (Ley 19.628)<br/>- Programa respaldos automáticos de la planilla"]
+    end
+
+    subgraph CONTROL_ALCALDIA ["4. DIRECCIÓN DIDECO / ALCALDÍA / CONTRALORÍA"]
+        ALC_REP["Jefatura DIDECO y Alcaldía<br/>- Visualiza Tablero de Control en tiempo real<br/>- Conoce ventas consolidadas por feria<br/>- Monitorea tasa de formalización comunal"]
+        CONT_AUD["Auditoría Interna y Concejo Municipal<br/>- Audita actas de sorteo y bitácora inmutable<br/>- Verifica ausencia de discrecionalidad política"]
+    end
+
+    %% Flujo de Operación
+    TI_ADMIN -.->|"Provee plataforma segura y permisos"| D_COORD
+    D_COORD -->|"1. Publica bases y abre convocatoria"| C_POST
+    C_POST -->|"2. Envía postulación y expediente digital"| D_EVAL
+    D_EVAL -->|"3. Entrega nómina técnica de admisibles"| D_COORD
+    D_COORD -->|"4. Ejecuta sorteo transparente (LCG)"| D_COORD
+    D_COORD -->|"5. Emite nómina de titulares y lista de espera"| C_POST
+    D_COORD -->|"6. Traspasa lista de stands asignados"| D_TERR
+    C_POST -->|"7. Se instala en el stand adjudicado"| D_TERR
+    D_TERR -->|"8. Registra asistencia y ventas diarias"| D_COORD
+    D_COORD -->|"9. Consolida informe de impacto económico"| ALC_REP
+    D_COORD -.->|"10. Pone a disposición actas y bitácora"| CONT_AUD
+```
+
+---
+
+### 5.2 Flujograma del Procesamiento y Ciclo de Datos del Departamento
+
+Este diagrama muestra la **trazabilidad técnica de los datos**: desde que el ciudadano los digita, pasando por los filtros de depuración y resguardo criptográfico, hasta convertirse en reportes estratégicos para la autoridad comunal:
+
+```mermaid
+flowchart LR
+    subgraph INGESTA ["1. ENTRADA DE DATOS"]
+        direction TB
+        IN_TXT["Datos Alfanuméricos<br/>- RUT Titular<br/>- Teléfono y Email<br/>- Nombre Fantasía<br/>- Tramo % RSH"]
+        IN_DOC["Archivos Binarios<br/>- Cartola RSH (PDF)<br/>- Iniciación SII (PDF)<br/>- Res. Sanitaria (PDF)<br/>- Muestras (JPG/PNG)"]
+    end
+
+    subgraph DEPURACION ["2. LIMPIEZA Y RESGUARDO"]
+        direction TB
+        CLEAN_RUT["Validador Módulo 11<br/>- Corrige formato (12345678-5)<br/>- Bloquea RUT falso"]
+        CLEAN_TEL["Normalizador E.164<br/>- Estandariza a +569..."]
+        HASH_SHA["Motor SHA-256<br/>- Calcula hash único del archivo<br/>- Deduplica y evita almacenamiento redundante"]
+    end
+
+    subgraph NUCLEO_PERSISTENCIA ["3. PERSISTENCIA NATIVA (G-WORKSPACE)"]
+        direction TB
+        DB_SHEETS[("Google Sheets Relacional<br/>(16 Tablas Normalizadas)<br/>- PERSONAS<br/>- EMPRENDIMIENTOS<br/>- POSTULACIONES<br/>- PARTICIPACIONES")]
+        DRIVE_EXP[("Google Drive Institucional<br/>(Expedientes Digitales)<br/>01_Expedientes/[Año]/[RUT]/...")]
+    end
+
+    subgraph MOTOR_DECISION ["4. PROCESAMIENTO Y DECISIÓN"]
+        direction TB
+        PRE_FILTER{"Prefiltro Normativo<br/>¿RSH <= Umbral?<br/>¿Tiene Res. Sanitaria si vende comida?"}
+        DRAW_LCG["Motor de Sorteo LCG<br/>- Semilla generada<br/>- Separación Titulares / Espera"]
+        CASCADE_ENGINE["Motor de Cascada<br/>- Corrimiento automático por deserciones"]
+    end
+
+    subgraph CAPTURA_TERRENO ["5. DATOS DE TERRENO"]
+        direction TB
+        FIELD_DATA["Captura Móvil en Feria<br/>- Asistencia efectiva (SI/NO)<br/>- Ventas diarias ($ CLP)<br/>- Observaciones de inspección"]
+    end
+
+    subgraph SALIDAS_REPORTABILIDAD ["6. SALIDAS E INTELIGENCIA MUNICIPAL"]
+        direction TB
+        OUT_ACTA["Acta Oficial de Selección<br/>(Descargable en Excel/PDF)"]
+        OUT_DASH["Tablero Ejecutivo Alcaldía<br/>- Monto total transaccionado<br/>- Venta promedio por rubro"]
+        OUT_AUDIT["Bitácora Inmutable (AUDITORIA)<br/>- Pista para Contraloría / Ley de Transparencia"]
+    end
+
+    %% Conexiones
+    IN_TXT --> CLEAN_RUT & CLEAN_TEL
+    IN_DOC --> HASH_SHA
+    CLEAN_RUT & CLEAN_TEL --> DB_SHEETS
+    HASH_SHA --> DRIVE_EXP
+    DRIVE_EXP -.->|"Índice y URL"| DB_SHEETS
+
+    DB_SHEETS --> PRE_FILTER
+    PRE_FILTER -- "Admisibles" --> DRAW_LCG
+    DRAW_LCG --> CASCADE_ENGINE
+    CASCADE_ENGINE --> OUT_ACTA
+    CASCADE_ENGINE --> FIELD_DATA
+    FIELD_DATA --> DB_SHEETS
+
+    DB_SHEETS --> OUT_DASH
+    DRAW_LCG & CASCADE_ENGINE & FIELD_DATA -.->|"Log transaccional"| OUT_AUDIT
+```
+
