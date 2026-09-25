@@ -3471,7 +3471,7 @@
       cerrarSidebar();
     }
 
-    const secciones = ['dashboard', 'fichas', 'nuevo', 'iniciativas', 'seleccion', 'seguimiento', 'expediente', 'turso'];
+    const secciones = ['dashboard', 'fichas', 'nuevo', 'iniciativas', 'seleccion', 'seguimiento', 'expediente'];
     secciones.forEach(s => {
       const el = document.getElementById('view' + s.charAt(0).toUpperCase() + s.slice(1));
       if (el) el.classList.add('hidden');
@@ -3510,11 +3510,10 @@
       dashboard: ['Consolidado Institucional', 'Dirección de Desarrollo Económico Local y padrón de emprendedores'],
       fichas: ['Padrón Comunal de Emprendedores', 'Consulta de fichas registradas y expedientes digitales'],
       nuevo: ['Registrar Ficha Nueva', 'Ingreso de personas naturales y unidades productivas'],
-      iniciativas: ['Ferias e Iniciativas Comunales', 'Convocatorias públicas, cupos y postulaciones en Turso'],
+      iniciativas: ['Ferias e Iniciativas Comunales', 'Convocatorias públicas, cupos y postulaciones en el sistema'],
       seleccion: ['Selección y Asignación de Emprendedores', 'Evaluación directa por funcionarios y gestión masiva en dos caminos'],
       seguimiento: ['Seguimiento e Impacto Post-Mercado', 'Evaluación masiva en terreno: asistencia, ventas por día y seguidores'],
-      expediente: ['Expediente Digital Google Drive', 'Subida organizada de documentación y certificados'],
-      turso: ['Base de Datos Turso (libSQL)', 'Pipeline API v2 y sincronización de esquema']
+      expediente: ['Expediente Digital Google Drive', 'Subida organizada de documentación y certificados']
     };
 
     if (titles[seccion]) {
@@ -3827,9 +3826,9 @@
 
     if (banner) banner.classList.add('hidden');
     if (btnCancel) btnCancel.classList.add('hidden');
-    if (btnTxt) btnTxt.textContent = 'Guardar en Turso';
+    if (btnTxt) btnTxt.textContent = 'Guardar Ficha';
     if (tituloForm) tituloForm.textContent = 'Formulario de Ficha Integral';
-    if (subForm) subForm.textContent = 'Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en Turso.';
+    if (subForm) subForm.textContent = 'Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en el sistema.';
 
     cambiarSeccion('fichas');
   };
@@ -3868,7 +3867,7 @@
     try {
       const res = await call('apiFichaGuardar', payload);
       if (res && res.success) {
-        mostrarToast(res.data?.mensaje || (esModoEdicion ? 'Datos actualizados con éxito en Turso.' : 'Ficha guardada con éxito en Turso.'), 'success');
+        mostrarToast(res.data?.mensaje || (esModoEdicion ? 'Datos actualizados con éxito.' : 'Ficha guardada con éxito.'), 'success');
         
         // Resetear modo edición
         cancelarEdicionFicha();
@@ -3883,7 +3882,7 @@
     }
   };
 
-  // Subir Documento a Drive y Turso
+  // Subir Documento a Drive
   window.cargarDocumentoDrive = async function(e) {
     if (e) e.preventDefault();
     const rut = document.getElementById('docRut')?.value;
@@ -3915,7 +3914,7 @@
           });
 
           if (res && res.success) {
-            mostrarToast('Documento guardado en Drive y registrado en Turso.', 'success');
+            mostrarToast('Documento guardado en Drive y registrado en el sistema.', 'success');
             document.getElementById('formCargaDoc')?.reset();
             cambiarSeccion('fichas');
           } else {
@@ -3931,68 +3930,6 @@
     } catch (err) {
       mostrarToast('Error leyendo archivo: ' + err.message, 'error');
       if (btn) btn.disabled = false;
-    }
-  };
-
-  // Métodos Turso (libSQL Pipeline API v2)
-  window.probarConexionTurso = async function() {
-    const log = document.getElementById('tursoStatusLog');
-    if (log) log.textContent = 'Probando conexión con Turso mediante HTTP Pipeline v2 (SELECT 1)...';
-    try {
-      const res = await call('apiTursoProbar');
-      if (res && res.success) {
-        if (log) log.textContent = `✓ CONEXIÓN EXITOSA CON TURSO\n- Fecha servidor Turso: ${res.data?.detalle?.fecha_servidor || 'OK'}\n- Mensaje: ${res.data?.mensaje || 'Conectado'}`;
-        mostrarToast('Conexión con Turso exitosa.', 'success');
-      } else {
-        if (log) log.textContent = `✕ FALLO DE CONEXIÓN:\n${res?.error || 'No se pudo conectar'}\n\nVerifica tu TURSO_DATABASE_URL y TURSO_AUTH_TOKEN.`;
-        mostrarToast('Error al conectar con Turso.', 'error');
-      }
-    } catch (err) {
-      if (log) log.textContent = `✕ ERROR: ${err.message}`;
-      mostrarToast(err.message, 'error');
-    }
-  };
-
-  window.guardarTursoConfig = async function(e) {
-    if (e) e.preventDefault();
-    const url = document.getElementById('cfgTursoUrl')?.value;
-    const token = document.getElementById('cfgTursoToken')?.value;
-    if (!url || !token) {
-      mostrarToast('Ingrese URL y Token de Turso.', 'error');
-      return;
-    }
-    const log = document.getElementById('tursoStatusLog');
-    if (log) log.textContent = 'Guardando credenciales de Turso en Propiedades del Script...';
-    try {
-      const res = await call('apiTursoConfigurar', url, token);
-      if (res && res.success) {
-        if (log) log.textContent = '✓ Credenciales guardadas y verificadas correctamente en Turso.';
-        mostrarToast('Credenciales guardadas y verificadas.', 'success');
-      } else {
-        if (log) log.textContent = `✕ Error al verificar credenciales:\n${res?.error || 'Error desconocido'}`;
-        mostrarToast(res?.error || 'Error al verificar credenciales', 'error');
-      }
-    } catch (err) {
-      if (log) log.textContent = `✕ ERROR: ${err.message}`;
-      mostrarToast(err.message, 'error');
-    }
-  };
-
-  window.inicializarTablasTurso = async function() {
-    const log = document.getElementById('tursoStatusLog');
-    if (log) log.textContent = 'Ejecutando sentencias DDL (CREATE TABLE IF NOT EXISTS) en Turso...';
-    try {
-      const res = await call('apiTursoInicializar');
-      if (res && res.success) {
-        if (log) log.textContent = `✓ TABLAS INICIALIZADAS EXITOSAMENTE\n- Tablas e Índices creados: ${res.data?.tablasCreadas || 7}\n- Mensaje: ${res.data?.mensaje || 'Listo'}`;
-        mostrarToast('Tablas e índices creados en Turso.', 'success');
-      } else {
-        if (log) log.textContent = `✕ Error inicializando DDL:\n${res?.error || 'Error de ejecución'}`;
-        mostrarToast(res?.error || 'Error creando tablas en Turso', 'error');
-      }
-    } catch (err) {
-      if (log) log.textContent = `✕ ERROR: ${err.message}`;
-      mostrarToast(err.message, 'error');
     }
   };
 
@@ -4655,7 +4592,7 @@
   window.cargarIniciativas = async function() {
     const contenedor = document.getElementById('listaIniciativasCards');
     if (!contenedor) return;
-    contenedor.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400">Cargando iniciativas de Turso...</div>';
+    contenedor.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400">Cargando iniciativas...</div>';
 
     // Cargar también estado del formulario público
     window.cargarEstadoFormularioOficial();
@@ -4663,7 +4600,7 @@
     try {
       const res = await call('apiIniciativasListar', { estado: 'ABIERTA' });
       if (res && (res.error || (!res.success && !res.ok))) {
-        const msg = (res.error ? (res.error.message || res.error) : 'Error desconocido al consultar Turso');
+        const msg = (res.error ? (res.error.message || res.error) : 'Error desconocido al consultar iniciativas');
         contenedor.innerHTML = `<div class="col-span-full py-8 text-center text-amber-600 text-xs">Aviso al cargar iniciativas: ${escapeHtml(msg)}</div>`;
         return;
       }
@@ -4759,7 +4696,7 @@
     const subtitulo = document.getElementById('subtituloModalIniciativa');
     if (subtitulo) subtitulo.textContent = 'Parámetros oficiales del sistema de ferias de la Municipalidad de Santiago';
     const btnSubmit = document.getElementById('btnSubmitIniciativa');
-    if (btnSubmit) btnSubmit.textContent = 'Guardar Mercado en Turso';
+    if (btnSubmit) btnSubmit.textContent = 'Guardar Mercado';
 
     const m = document.getElementById('modalCrearIniciativa');
     if (m) m.classList.remove('hidden');
@@ -4830,9 +4767,9 @@
       const titulo = document.getElementById('tituloModalIniciativa');
       if (titulo) titulo.textContent = 'Editar y Corregir Mercado / Convocatoria';
       const subtitulo = document.getElementById('subtituloModalIniciativa');
-      if (subtitulo) subtitulo.textContent = 'Actualice fechas, cupos, temáticas o estado del mercado en Turso';
+      if (subtitulo) subtitulo.textContent = 'Actualice fechas, cupos, temáticas o estado del mercado';
       const btnSubmit = document.getElementById('btnSubmitIniciativa');
-      if (btnSubmit) btnSubmit.textContent = 'Guardar Cambios en Turso';
+      if (btnSubmit) btnSubmit.textContent = 'Guardar Cambios';
 
       const m = document.getElementById('modalCrearIniciativa');
       if (m) m.classList.remove('hidden');
@@ -4901,7 +4838,7 @@
       const res = await call(endpoint, payload);
 
       if (res && res.success) {
-        mostrarToast(idIniciativa ? 'Mercado actualizado exitosamente en Turso.' : 'Mercado registrado exitosamente en Turso.', 'success');
+        mostrarToast(idIniciativa ? 'Mercado actualizado exitosamente.' : 'Mercado registrado exitosamente.', 'success');
         cerrarModalCrearIniciativa();
         cargarIniciativas();
         cargarSelectorIniciativasSeleccion();
@@ -4948,7 +4885,7 @@
       });
 
       if (res && res.success) {
-        mostrarToast('Postulación registrada exitosamente en Turso.', 'success');
+        mostrarToast('Postulación registrada exitosamente.', 'success');
         cerrarModalPostular();
       } else {
         mostrarToast(res?.error || 'Error registrando postulación', 'error');
@@ -4996,7 +4933,7 @@
     if (!idIniciativa) return;
     const tbody = document.getElementById('tablaPostulantesBody');
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Consultando postulaciones en Turso...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Consultando postulaciones...</td></tr>';
     }
 
     try {
@@ -5721,7 +5658,7 @@
     }
 
     try {
-      mostrarToast('Generando reporte del mercado desde Turso...', 'info');
+      mostrarToast('Generando reporte del mercado...', 'info');
       const res = await call('apiListarParticipantesSeguimiento', idIniciativa);
       const participantes = (res && res.success && res.data) ? res.data : [];
 
@@ -5823,7 +5760,7 @@
 
   window.exportarPadronGeneralTotalExcel = async function() {
     try {
-      mostrarToast('Consultando padrón comunal completo en Turso...', 'info');
+      mostrarToast('Consultando padrón comunal completo...', 'info');
       const res = await call('apiFichasListar', { limit: 1000 });
       const padron = (res && res.success && res.data) ? res.data : [];
 
@@ -6315,7 +6252,7 @@
     }
   }
 
-  // Guardar en Turso el seguimiento masivo con el desglose por día
+  // Guardar en sistema el seguimiento masivo con el desglose por día
   window.guardarSeguimientoMasivoEnTerreno = async function() {
     const idIniciativa = document.getElementById('segIniciativaMasivo')?.value;
     if (!idIniciativa) {
@@ -6367,7 +6304,7 @@
     });
 
     try {
-      mostrarToast('Guardando seguimiento y desglose por día en Turso...', 'info');
+      mostrarToast('Guardando seguimiento y desglose por día...', 'info');
       const res = await call('apiGuardarSeguimientoMasivo', {
         idIniciativa: idIniciativa,
         jornadas: jornadasSeguimientoActual,
@@ -6375,7 +6312,7 @@
       });
 
       if (res && res.success) {
-        mostrarToast(`✓ Se guardó exitosamente el seguimiento con ventas por día de ${payloadFilas.length} participantes en Turso.`, 'success');
+        mostrarToast(`✓ Se guardó exitosamente el seguimiento con ventas por día de ${payloadFilas.length} participantes.`, 'success');
         actualizarDashboardCompleto();
         // Recargar para sincronizar cálculos y estado oficial
         cargarParticipantesSeguimientoMasivo(idIniciativa);
@@ -6416,7 +6353,7 @@
     
     const listaContainer = document.getElementById('listaDocsExpediente');
     if (listaContainer) {
-      listaContainer.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Cargando expediente digital desde Google Drive y Turso...</div>';
+      listaContainer.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Cargando expediente digital desde Google Drive...</div>';
     }
     const elConteo = document.getElementById('docConteoTotal');
     if (elConteo) elConteo.textContent = '0 documentos';
@@ -6536,7 +6473,7 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                   </a>
                 ` : `
-                  <span class="text-[11px] text-slate-400 italic">Registrado en Turso</span>
+                  <span class="text-[11px] text-slate-400 italic">Registrado en Google Sheets</span>
                 `}
               </div>
             </div>

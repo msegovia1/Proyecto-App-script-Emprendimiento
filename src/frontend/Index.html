@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= appName ?> · Municipalidad de Santiago</title>
-  <meta name="description" content="Plataforma de gestión de emprendedores, expedientes en Google Drive y base de datos relacional Turso (libSQL)">
+  <meta name="description" content="Plataforma de gestión de emprendedores, expedientes en Google Drive y base de datos relacional Google Sheets">
   <meta property="og:title" content="<?= appName ?>">
   <meta property="og:description" content="Sistema de Gestión de Emprendimientos - Municipalidad de Santiago">
   <link rel="icon" type="image/png" href="data:image/png;base64,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">
@@ -127,15 +127,6 @@
           </svg>
           <span class="truncate">Documentos & Expedientes</span>
         </button>
-
-        <button id="navBtnTurso" onclick="cambiarSeccion('turso')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-blue-100 hover:bg-muni-800 hover:text-white transition text-left">
-          <svg class="w-4 h-4 flex-shrink-0 text-current" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-          <span class="truncate">Auditoría & Base Turso</span>
-        </button>
       </nav>
     </div>
 
@@ -147,7 +138,7 @@
       </div>
       <div class="text-slate-400 flex justify-between items-center text-[11px]">
         <span>Conexión Activa:</span>
-        <span class="text-oro-400 font-mono font-semibold">Turso Pipeline v2</span>
+        <span class="text-oro-400 font-mono font-semibold">Google Workspace</span>
       </div>
     </div>
   </aside>
@@ -168,13 +159,13 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <button onclick="actualizarDashboardCompleto()" title="Actualizar datos desde Turso" class="p-2 text-slate-500 hover:text-muni-700 hover:bg-slate-100 rounded-lg transition flex items-center gap-1.5 text-xs font-semibold">
+        <button onclick="actualizarDashboardCompleto()" title="Actualizar datos" class="p-2 text-slate-500 hover:text-muni-700 hover:bg-slate-100 rounded-lg transition flex items-center gap-1.5 text-xs font-semibold">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           <span class="hidden md:inline">Actualizar</span>
         </button>
-        <span id="badgeEstadoTurso" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span id="badgeEstadoSistema" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          Base Turso libSQL Online
+          Google Sheets Online
         </span>
       </div>
     </header>
@@ -193,7 +184,7 @@
           <div>
             <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
               <span>📊 Dashboard Integral de Desarrollo Económico Local</span>
-              <span class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">Turso Conectado</span>
+              <span class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold">Google Sheets Conectado</span>
             </h2>
             <p class="text-xs text-slate-500">Métricas consolidadas de padrón comunal, expedientes, mercados y ventas generadas en la comuna.</p>
           </div>
@@ -242,7 +233,7 @@
             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span class="font-bold">Los gráficos se actualizan con la información vigente del sistema.</span>
           </div>
-          <div class="text-[11px] text-emerald-700 hidden sm:block">Datos sincronizados con Turso libSQL</div>
+          <div class="text-[11px] text-emerald-700 hidden sm:block">Datos sincronizados con Google Sheets</div>
         </div>
 
         <!-- Grid de los 6 Gráficos Idénticos a la Imagen de Apps Script -->
@@ -452,7 +443,7 @@
 
           <div class="border-b border-slate-100 pb-4 mb-5">
             <h2 id="tituloFormFicha" class="text-base font-bold text-slate-800">Formulario de Ficha Integral</h2>
-            <p id="subtituloFormFicha" class="text-xs text-slate-500">Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en Turso.</p>
+            <p id="subtituloFormFicha" class="text-xs text-slate-500">Valida automáticamente el formato nacional de RUT chileno (módulo 11) y el teléfono antes de guardar en el sistema.</p>
           </div>
 
           <form id="formFicha" onsubmit="guardarFormularioFicha(event)" class="space-y-6">
@@ -576,7 +567,7 @@
               </button>
               <button type="submit" id="btnGuardarFicha" class="w-full sm:w-auto px-6 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-sm font-semibold rounded-lg shadow-md transition flex items-center justify-center gap-2">
                 <span id="btnGuardarFichaIcono">💾</span>
-                <span id="btnGuardarFichaTexto">Guardar en Turso</span>
+                <span id="btnGuardarFichaTexto">Guardar Ficha</span>
               </button>
             </div>
           </form>
@@ -589,7 +580,7 @@
           <div class="border-b border-slate-100 pb-4 mb-5">
             <h2 class="text-base font-bold text-slate-800">Cargar Documento al Expediente Digital</h2>
             <p class="text-xs text-slate-500">
-              El archivo se guardará en la estructura organizada de la <strong>Unidad Compartida DIDEL</strong> (<code>01_Expedientes / [Año] / [RUT - Nombre]</code>) y sus metadatos y hash SHA-256 se registrarán en <strong>Turso</strong>.
+              El archivo se guardará en la estructura organizada de la <strong>Unidad Compartida DIDEL</strong> (<code>01_Expedientes / [Año] / [RUT - Nombre]</code>) y sus metadatos y hash SHA-256 se registrarán en el sistema institucional.
             </p>
           </div>
 
@@ -643,7 +634,7 @@
                     Alojado en Mi Unidad · Seguro
                   </span>
                 </div>
-                <p class="text-xs text-blue-200 mt-1 leading-relaxed">Los postulantes adjuntan cédula, RSH, SII y fotos de productos. El sistema los guarda en Drive e ingresa en Turso automáticamente.</p>
+                <p class="text-xs text-blue-200 mt-1 leading-relaxed">Los postulantes adjuntan cédula, RSH, SII y fotos de productos. El sistema los guarda en Drive y los registra en la base institucional automáticamente.</p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2 flex-shrink-0 max-w-full">
@@ -671,7 +662,7 @@
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div>
             <h2 class="text-base font-bold text-slate-800">Convocatorias y Ferias Comunales</h2>
-            <p class="text-xs text-slate-500">Administra iniciativas de desarrollo económico local, cupos de titulares/suplentes y postulaciones registradas en Turso.</p>
+            <p class="text-xs text-slate-500">Administra iniciativas de desarrollo económico local, cupos de titulares/suplentes y postulaciones registradas en el sistema.</p>
           </div>
           <button onclick="mostrarModalCrearIniciativa()" class="px-4 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -1171,7 +1162,7 @@
                 <span>Crecimiento Neto de Seguidores: <strong id="lblSumaSeguidoresEnVivo" class="text-purple-700 text-sm font-bold">+0</strong></span>
               </div>
               <button type="button" onclick="guardarSeguimientoMasivoEnTerreno()" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg shadow transition">
-                💾 Guardar Todos los Cambios en Turso
+                💾 Guardar Todos los Cambios
               </button>
             </div>
           </div>
@@ -1315,7 +1306,7 @@
 
             <div class="border-t border-slate-100 pt-3 flex justify-end gap-2">
               <button type="button" onclick="cerrarModalCrearIniciativa()" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200">Cancelar</button>
-              <button type="submit" id="btnSubmitIniciativa" class="px-5 py-2 bg-muni-600 text-white font-bold rounded-lg shadow hover:bg-muni-700">Guardar Mercado en Turso</button>
+              <button type="submit" id="btnSubmitIniciativa" class="px-5 py-2 bg-muni-600 text-white font-bold rounded-lg shadow hover:bg-muni-700">Guardar Mercado</button>
             </div>
           </form>
         </div>
@@ -1374,7 +1365,7 @@
 
           <!-- Pie del Modal -->
           <div class="border-t border-slate-100 pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <span class="text-slate-500 text-[11px]">Los documentos se sincronizan con las carpetas institucionales de Google Drive y Turso.</span>
+            <span class="text-slate-500 text-[11px]">Los documentos se sincronizan con las carpetas institucionales de Google Drive y Google Sheets.</span>
             <button type="button" onclick="cerrarModalDocumentos()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow transition">
               Entendido / Cerrar
             </button>
@@ -1409,55 +1400,6 @@
           </form>
         </div>
       </div>
-
-      <!-- 7. VISTA CONFIGURACIÓN Y ESTADO TURSO -->
-      <section id="viewTurso" class="hidden max-w-3xl mx-auto space-y-6">
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div class="border-b border-slate-100 pb-4 mb-5 flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-bold text-slate-800">Conexión a Turso (libSQL Pipeline API v2)</h2>
-              <p class="text-xs text-slate-500">Conexión directa vía HTTP puro con UrlFetchApp (sin dependencias de Node)</p>
-            </div>
-            <button onclick="probarConexionTurso()" class="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-100 border border-blue-200 transition">
-              Probar Conexión
-            </button>
-          </div>
-
-          <form id="formTursoConfig" onsubmit="guardarTursoConfig(event)" class="space-y-4">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Turso Database URL (HTTP)</label>
-              <input type="text" id="cfgTursoUrl" placeholder="https://tu-base-tu-usuario.turso.io" 
-                     class="w-full text-sm font-mono px-3 py-2 border border-slate-300 rounded-lg">
-              <span class="text-[11px] text-slate-400">Si tu URL comienza con <code>libsql://</code>, el sistema la convertirá a <code>https://</code> automáticamente.</span>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Turso Auth Token (Bearer)</label>
-              <input type="password" id="cfgTursoToken" placeholder="eyJhbGciOiJFZERTQ..." 
-                     class="w-full text-sm font-mono px-3 py-2 border border-slate-300 rounded-lg">
-              <span class="text-[11px] text-slate-400">Generado con <code>turso db tokens create [nombre-db]</code> en tu terminal o en la consola web de Turso.</span>
-            </div>
-
-            <div class="flex items-center justify-between border-t border-slate-100 pt-4">
-              <button type="button" onclick="inicializarTablasTurso()" class="px-4 py-2 bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold rounded-lg hover:bg-amber-100 transition">
-                ⚡ Inicializar Tablas DDL (personas, docs, etc.)
-              </button>
-              <button type="submit" class="px-5 py-2.5 bg-muni-600 hover:bg-muni-700 text-white text-sm font-semibold rounded-lg shadow transition">
-                Guardar Credenciales
-              </button>
-            </div>
-          </form>
-
-          <!-- Consola de Resultados / Estado -->
-          <div class="mt-6 p-4 rounded-xl bg-slate-900 text-slate-200 font-mono text-xs">
-            <div class="text-slate-400 font-semibold mb-1 flex items-center justify-between">
-              <span>Terminal de Estado:</span>
-              <span class="text-emerald-400 text-[11px]">HTTP Pipeline v2</span>
-            </div>
-            <div id="tursoStatusLog" class="text-slate-300 whitespace-pre-wrap">Sistema listo. Puedes probar la conexión con Turso o inicializar tablas cuando lo desees.</div>
-          </div>
-        </div>
-      </section>
 
       <!-- MODAL DETALLE DE FICHA -->
       <div id="modalFicha" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
@@ -1518,7 +1460,7 @@
           <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
             <div class="font-bold text-slate-700 text-xs flex items-center justify-between">
               <span>Subir documento a esta carpeta</span>
-              <span class="text-[10px] text-slate-400">Drive / Turso</span>
+              <span class="text-[10px] text-slate-400">Google Drive</span>
             </div>
             <div class="flex gap-2">
               <input type="file" id="inputArchivoCarpeta" class="text-xs text-slate-500 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-muni-700 file:text-white hover:file:bg-muni-800 w-full">

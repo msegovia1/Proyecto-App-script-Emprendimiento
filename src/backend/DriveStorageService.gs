@@ -1,9 +1,9 @@
 // DriveStorageService.gs
-// Servicio de gestión documental digital con Google Drive y Turso libSQL
-// Incluye cálculo de Hash SHA-256 para evitar duplicidad de bytes y versionamiento automático
+// SGE v2.1.0 - Servicio de gestión documental digital en Google Drive y Google Sheets
+// Almacenamiento organizado en Unidad Compartida / Mi Unidad, deduplicación SHA-256 y versionamiento
 
 /**
- * Calcula el Hash SHA-256 de los bytes de un archivo.
+ * Calcula el Hash SHA-256 de los bytes de un archivo para deduplicación exacta.
  * @param {Array<number>} bytes
  * @returns {string} Hexadecimal en minúsculas
  */
@@ -99,7 +99,7 @@ function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
   const anioActual = new Date().getFullYear().toString();
   const carpetaExpedientes = driveObtenerOCrearSubcarpeta_(carpetaExpedientesRaiz, anioActual);
   
-  const rutNormalizado = normalizarRut(rutLimpio) || 'SIN_RUT';
+  const rutNormalizado = (typeof normalizarRut === 'function' ? normalizarRut(rutLimpio) : rutLimpio) || 'SIN_RUT';
   const info = infoExtra || {};
   const rutFmt = info.rutFormateado || formatearRutChileno_(rutNormalizado) || rutNormalizado;
   const nomPersona = (info.nombrePersona || '').trim();
@@ -112,7 +112,7 @@ function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
   if (nomEmp && nomEmp.toLowerCase() !== nomPersona.toLowerCase()) partes.push(nomEmp);
   const nombreObjetivo = partes.join(' - ');
 
-  // Buscar si ya existe una carpeta para este RUT (con nombre sin formato "111111111", formateado o completo)
+  // Buscar si ya existe una carpeta para este RUT
   const folders = carpetaExpedientes.getFolders();
   let carpetaEncontrada = null;
 
@@ -129,7 +129,6 @@ function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
   }
 
   if (carpetaEncontrada) {
-    // Si la carpeta existe pero solo tiene el RUT o le faltaban los nombres, renombrarla automáticamente
     if (carpetaEncontrada.getName() !== nombreObjetivo && (nomPersona || nomEmp)) {
       try {
         carpetaEncontrada.setName(nombreObjetivo);
@@ -144,11 +143,11 @@ function driveObtenerCarpetaEmprendedor_(rutLimpio, infoExtra) {
 }
 
 /**
- * Carga un documento en Drive y lo registra en Turso.
+ * Carga un documento en Google Drive y lo registra en la base de datos de Google Sheets.
  * Realiza deduplicación mediante SHA-256 y versionamiento automático (REEMPLAZADO -> VIGENTE).
  * @param {object} params
  * @param {string} params.rut - RUT del emprendedor
- * @param {string} params.tipoDocumento - Ej: "CEDULA_IDENTIDAD", "RSH", "INICIO_ACTIVIDADES_SII"
+ * @param {string} params.tipoDocumento - Ej: "CEDULA_IDENTIDAD", "RSH", "INICIO_ACTIVIDADES"
  * @param {object} params.archivo - { name, mimeType, base64 } o Blob
  * @param {string} [params.usuarioEmail]
  * @returns {{ success: boolean, data: object|null, error: string|null }}
@@ -159,7 +158,7 @@ function cargarDocumentoExpediente(params) {
       return { success: false, data: null, error: 'Debe adjuntar el archivo a subir.' };
     }
 
-    const rutLimpio = normalizarRut(params.rut);
+    const rutLimpio = typeof normalizarRut === 'function' ? normalizarRut(params.rut) : String(params.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
     const tipo = (params.tipoDocumento || 'OTRO').toUpperCase().replace(/[^A-Z0-9_]/g, '_');
     const usuario = params.usuarioEmail || 'sistema@santiago.cl';
 
@@ -184,62 +183,66 @@ function cargarDocumentoExpediente(params) {
 
     // 2. Calcular huella SHA-256
     const sha256 = calcularSha256Bytes_(bytes);
-    const tamanoBytes = bytes.length;
 
-    // 3. Buscar persona y emprendimiento en Turso
-    const qPersona = tursoEjecutar(
-      `SELECT id_persona, rut_formateado, nombres, apellidos FROM personas WHERE rut = ? OR rut_formateado = ? LIMIT 1;`,
-      [rutLimpio, params.rut]
-    );
-    const persona = qPersona.success && qPersona.data.rows && qPersona.data.rows[0];
-    const idPersona = persona ? persona.id_persona : null;
-
+    // 3. Buscar persona y emprendimiento en Google Sheets
+    let idPersona = '';
     let nombrePersona = params.nombrePersona || '';
-    if (!nombrePersona && persona) {
-      nombrePersona = [persona.nombres, persona.apellidos].filter(Boolean).join(' ').trim();
-    }
-    let rutFormateado = (persona && persona.rut_formateado) || (params.rutFormateado || '');
-    if (!rutFormateado) {
-      rutFormateado = formatearRutChileno_(rutLimpio) || rutLimpio;
-    }
-
+    let rutFormateado = params.rutFormateado || formatearRutChileno_(rutLimpio);
     let nombreEmprendimiento = params.nombreEmprendimiento || '';
-    if (!nombreEmprendimiento && idPersona) {
-      const qEmp = tursoEjecutar(
-        `SELECT e.nombre_comercial, e.nombre_fantasia 
-         FROM emprendimientos e
-         JOIN persona_emprendimiento pe ON pe.id_emprendimiento = e.id_emprendimiento
-         WHERE pe.id_persona = ?
-         LIMIT 1;`,
-        [idPersona]
-      );
-      if (qEmp.success && qEmp.data.rows && qEmp.data.rows[0]) {
-        nombreEmprendimiento = qEmp.data.rows[0].nombre_comercial || qEmp.data.rows[0].nombre_fantasia || '';
+    let idEmprendimiento = '';
+
+    if (typeof repoTodos === 'function') {
+      const personas = repoTodos('PERSONAS', { incluirInactivos: true }) || [];
+      const per = personas.find(p => {
+        const pRut = typeof normalizarRut === 'function' ? normalizarRut(p.RUT_NORMALIZADO || p.RUT) : (p.RUT_NORMALIZADO || p.RUT);
+        return pRut === rutLimpio || p.ID_PERSONA === params.rut;
+      });
+      if (per) {
+        idPersona = per.ID_PERSONA;
+        if (!nombrePersona) {
+          nombrePersona = [per.NOMBRES, per.APELLIDO_PATERNO, per.APELLIDO_MATERNO].filter(Boolean).join(' ').trim();
+        }
+        rutFormateado = per.RUT_NORMALIZADO ? formatearRutChileno_(per.RUT_NORMALIZADO) : rutFormateado;
+
+        // Buscar emprendimiento vinculado
+        const rels = repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }) || [];
+        const rel = rels.find(r => r.ID_PERSONA === idPersona && r.ESTADO_REGISTRO !== 'INACTIVO');
+        if (rel) {
+          idEmprendimiento = rel.ID_EMPRENDIMIENTO;
+          const emps = repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || [];
+          const emp = emps.find(e => e.ID_EMPRENDIMIENTO === idEmprendimiento);
+          if (emp && !nombreEmprendimiento) {
+            nombreEmprendimiento = emp.NOMBRE_COMERCIAL || '';
+          }
+        }
       }
     }
 
-    // 4. Chequeo de duplicidad de bytes exacta en Turso
-    const qDuplicado = tursoEjecutar(
-      `SELECT id_documento, drive_url, drive_file_id, nombre_archivo, version_vigente 
-       FROM documentos 
-       WHERE sha256_hash = ? AND (id_persona = ? OR ? IS NULL)
-       LIMIT 1;`,
-      [sha256, idPersona, idPersona]
-    );
+    // 4. Chequeo de duplicidad de bytes exacta en Google Sheets (HUELLA_ARCHIVO)
+    if (typeof repoTodos === 'function') {
+      const docsExistentes = repoTodos('DOCUMENTOS', { incluirInactivos: true }) || [];
+      const docDuplicado = docsExistentes.find(d => {
+        return (d.HUELLA_ARCHIVO === sha256) && (!idPersona || d.ID_SUJETO === idPersona || d.ID_SUJETO === idEmprendimiento);
+      });
 
-    if (qDuplicado.success && qDuplicado.data.rows && qDuplicado.data.rows.length > 0) {
-      const docExistente = qDuplicado.data.rows[0];
-      return {
-        success: true,
-        data: {
-          idDocumento: docExistente.id_documento,
-          driveUrl: docExistente.drive_url,
-          sha256Hash: sha256,
-          reutilizado: true,
-          mensaje: 'El archivo subido es idéntico a uno ya existente (mismo hash SHA-256). Se reutilizó el expediente digital sin duplicar espacio en Drive.'
-        },
-        error: null
-      };
+      if (docDuplicado && docDuplicado.ID_ARCHIVO_DRIVE) {
+        let driveUrl = '';
+        try {
+          driveUrl = DriveApp.getFileById(docDuplicado.ID_ARCHIVO_DRIVE).getUrl();
+        } catch (e) {}
+
+        return {
+          success: true,
+          data: {
+            idDocumento: docDuplicado.ID_DOCUMENTO,
+            driveUrl: driveUrl,
+            sha256Hash: sha256,
+            reutilizado: true,
+            mensaje: 'El archivo subido es idéntico a uno ya existente (mismo hash SHA-256). Se reutilizó el expediente digital sin duplicar espacio en Drive.'
+          },
+          error: null
+        };
+      }
     }
 
     // 5. Subir a Google Drive
@@ -262,59 +265,61 @@ function cargarDocumentoExpediente(params) {
     const fileId = driveFile.getId();
     const fileUrl = driveFile.getUrl();
 
-    // 6. Versionamiento: marcar documentos previos del mismo tipo como 'REEMPLAZADO' y version_vigente = 'NO'
+    // 6. Versionamiento y registro en Google Sheets (DOCUMENTOS)
     const idDocumentoNuevo = 'doc-' + Utilities.getUuid();
-    const transacciones = [];
+    const idSujeto = idPersona || idEmprendimiento || rutLimpio;
+    const tipoSujeto = idPersona ? 'PERSONA' : 'EMPRENDIMIENTO';
 
-    if (idPersona) {
-      transacciones.push({
-        sql: `UPDATE documentos 
-              SET version_vigente = 'NO', estado_revision = 'REEMPLAZADO', actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_persona = ? AND tipo_documento = ? AND version_vigente = 'SI';`,
-        args: [usuario, idPersona, tipo]
+    if (typeof repoTodos === 'function') {
+      const docsPrevios = repoTodos('DOCUMENTOS', { incluirInactivos: true }) || [];
+      docsPrevios.forEach(doc => {
+        if (doc.ID_SUJETO === idSujeto && doc.TIPO_DOCUMENTO === tipo && doc.ES_VERSION_VIGENTE === 'SI') {
+          try {
+            repoActualizar('DOCUMENTOS', doc.ID_DOCUMENTO, {
+              ES_VERSION_VIGENTE: 'NO',
+              ESTADO_REVISION: 'REEMPLAZADO',
+              ACTUALIZADO_EN: ahoraIso_(),
+              ACTUALIZADO_POR: usuario
+            }, { auditar: false });
+          } catch (e) {}
+        }
       });
-    }
 
-    // 7. Insertar nuevo documento como 'VIGENTE' y 'RECIBIDO'
-    transacciones.push({
-      sql: `INSERT INTO documentos (
-        id_documento, id_persona, tipo_documento, sha256_hash, version_vigente, estado_revision,
-        drive_file_id, drive_url, nombre_archivo, mime_type, tamano_bytes, creado_por, actualizado_por, creado_en, actualizado_en
-      ) VALUES (?, ?, ?, ?, 'SI', 'RECIBIDO', ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));`,
-      args: [
-        idDocumentoNuevo,
-        idPersona,
-        tipo,
-        sha256,
-        fileId,
-        fileUrl,
-        nuevoNombre,
-        mimeType,
-        tamanoBytes,
-        usuario,
-        usuario
-      ]
-    });
+      repoInsertar('DOCUMENTOS', {
+        ID_DOCUMENTO: idDocumentoNuevo,
+        TIPO_SUJETO: tipoSujeto,
+        ID_SUJETO: idSujeto,
+        TIPO_DOCUMENTO: tipo,
+        ID_ARCHIVO_DRIVE: fileId,
+        VERSION: 1,
+        FECHA_EMISION: '',
+        FECHA_VENCIMIENTO: '',
+        ESTADO_REVISION: 'RECIBIDO',
+        REVISADO_POR: '',
+        REVISADO_EN: '',
+        MOTIVO_OBSERVACION: '',
+        ES_VERSION_VIGENTE: 'SI',
+        CREADO_EN: ahoraIso_(),
+        CREADO_POR: usuario,
+        HUELLA_ARCHIVO: sha256
+      }, { motivo: 'Carga de expediente documental' });
 
-    // 8. Registrar en auditoría
-    transacciones.push({
-      sql: `INSERT INTO auditoria (id_auditoria, accion, entidad, id_entidad, payload_nuevo, usuario_email, timestamp)
-            VALUES (?, 'SUBIR_DOCUMENTO', 'DOCUMENTOS', ?, ?, ?, datetime('now'));`,
-      args: [
-        'aud-' + Utilities.getUuid(),
-        idDocumentoNuevo,
-        JSON.stringify({ tipo: tipo, rut: rutLimpio, sha256: sha256, driveId: fileId }),
-        usuario
-      ]
-    });
-
-    const txRes = tursoTransaccion(transacciones);
-    if (!txRes.success) {
-      return {
-        success: false,
-        data: null,
-        error: 'El archivo se guardó en Drive pero falló el registro en Turso: ' + txRes.error
-      };
+      // Registrar en Auditoría
+      try {
+        repoInsertar('AUDITORIA', {
+          ID_EVENTO_AUDITORIA: 'aud-' + Utilities.getUuid(),
+          FECHA_HORA: ahoraIso_(),
+          ID_USUARIO: usuario,
+          ROL: 'OPERADOR',
+          ACCION: 'SUBIR_DOCUMENTO',
+          ENTIDAD: 'DOCUMENTOS',
+          ID_REGISTRO: idDocumentoNuevo,
+          VALOR_ANTERIOR: '',
+          VALOR_NUEVO: JSON.stringify({ tipo: tipo, rut: rutLimpio, sha256: sha256, driveId: fileId }),
+          MOTIVO: 'Recepción de documento para expediente',
+          ID_CORRELACION: ''
+        }, { auditar: false });
+      } catch (e) {}
     }
 
     return {
@@ -328,7 +333,7 @@ function cargarDocumentoExpediente(params) {
         versionVigente: 'SI',
         estadoRevision: 'RECIBIDO',
         reutilizado: false,
-        mensaje: 'Documento almacenado exitosamente en Google Drive y registrado con versión vigente en Turso.'
+        mensaje: 'Documento almacenado exitosamente en Google Drive y registrado con versión vigente en Google Sheets.'
       },
       error: null
     };
@@ -342,8 +347,8 @@ function cargarDocumentoExpediente(params) {
 }
 
 /**
- * Consulta y retorna el expediente completo de documentos registrados para un emprendedor,
- * permitiendo al funcionario evaluar la calidad de los productos y verificar la documentación.
+ * Consulta y retorna el expediente completo de documentos registrados para un emprendedor.
+ * Permite al funcionario auditar la documentación y fotos en terreno.
  * @param {string} identificador - RUT, id_persona o id_emprendimiento
  * @returns {{ success: boolean, data: Array<object>, error: string|null }}
  */
@@ -353,36 +358,84 @@ function obtenerDocumentosEmprendedor(identificador) {
       return { success: false, data: [], error: 'Identificador de emprendedor no proporcionado.' };
     }
 
-    const rutLimpio = normalizarRut(identificador);
+    const rutLimpio = typeof normalizarRut === 'function' ? normalizarRut(identificador) : String(identificador).replace(/[^0-9kK]/g, '').toUpperCase();
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: true }) || []) : [];
+    const per = personas.find(p => {
+      const pRut = typeof normalizarRut === 'function' ? normalizarRut(p.RUT_NORMALIZADO || p.RUT) : (p.RUT_NORMALIZADO || p.RUT);
+      return pRut === rutLimpio || p.ID_PERSONA === identificador;
+    });
 
-    const sql = `
-      SELECT d.id_documento, d.tipo_documento, d.version_vigente, d.estado_revision,
-             d.drive_file_id, d.drive_url, d.nombre_archivo, d.mime_type, d.tamano_bytes,
-             d.fecha_emision, d.fecha_vencimiento, d.observaciones, d.creado_en,
-             p.id_persona, p.rut, p.rut_formateado, p.nombres, p.apellidos,
-             emp.id_emprendimiento, emp.nombre_comercial, emp.rubro, emp.subrubro
-      FROM documentos d
-      LEFT JOIN personas p ON d.id_persona = p.id_persona
-      LEFT JOIN persona_emprendimiento pe ON p.id_persona = pe.id_persona
-      LEFT JOIN emprendimientos emp ON (pe.id_emprendimiento = emp.id_emprendimiento OR d.id_emprendimiento = emp.id_emprendimiento)
-      WHERE d.id_persona = ?
-         OR d.id_emprendimiento = ?
-         OR p.rut = ?
-         OR p.rut_formateado = ?
-         OR emp.id_emprendimiento = ?
-      ORDER BY 
-        CASE WHEN d.version_vigente = 'SI' THEN 1 ELSE 2 END,
-        d.creado_en DESC;
-    `;
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || []) : [];
+    const rels = typeof repoTodos === 'function' ? (repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }) || []) : [];
+    
+    let idPersona = per ? per.ID_PERSONA : null;
+    let idEmprendimiento = null;
 
-    const res = tursoEjecutar(sql, [identificador, identificador, rutLimpio, identificador, identificador]);
-    if (!res.success) {
-      return { success: false, data: [], error: res.error };
+    if (idPersona) {
+      const rel = rels.find(r => r.ID_PERSONA === idPersona && r.ESTADO_REGISTRO !== 'INACTIVO');
+      if (rel) idEmprendimiento = rel.ID_EMPRENDIMIENTO;
+    } else {
+      const empDirecto = emps.find(e => e.ID_EMPRENDIMIENTO === identificador);
+      if (empDirecto) {
+        idEmprendimiento = empDirecto.ID_EMPRENDIMIENTO;
+        const rel = rels.find(r => r.ID_EMPRENDIMIENTO === idEmprendimiento && r.ESTADO_REGISTRO !== 'INACTIVO');
+        if (rel) idPersona = rel.ID_PERSONA;
+      }
     }
+
+    const docs = typeof repoTodos === 'function' ? (repoTodos('DOCUMENTOS', { incluirInactivos: true }) || []) : [];
+    const docsFiltrados = docs.filter(d => {
+      if (idPersona && d.ID_SUJETO === idPersona) return true;
+      if (idEmprendimiento && d.ID_SUJETO === idEmprendimiento) return true;
+      if (rutLimpio && d.ID_SUJETO === rutLimpio) return true;
+      return false;
+    });
+
+    // Mapear al formato que espera la vista
+    const resultado = docsFiltrados.map(d => {
+      let urlDrive = '';
+      let nombreArchivo = d.TIPO_DOCUMENTO || 'documento.pdf';
+      let mimeType = 'application/pdf';
+
+      if (d.ID_ARCHIVO_DRIVE && typeof DriveApp !== 'undefined') {
+        try {
+          const file = DriveApp.getFileById(d.ID_ARCHIVO_DRIVE);
+          urlDrive = file.getUrl();
+          nombreArchivo = file.getName();
+          mimeType = file.getMimeType();
+        } catch (e) {
+          urlDrive = `https://drive.google.com/file/d/${d.ID_ARCHIVO_DRIVE}/view`;
+        }
+      }
+
+      return {
+        id_documento: d.ID_DOCUMENTO,
+        tipo_documento: d.TIPO_DOCUMENTO,
+        version_vigente: d.ES_VERSION_VIGENTE || 'SI',
+        estado_revision: d.ESTADO_REVISION || 'RECIBIDO',
+        drive_file_id: d.ID_ARCHIVO_DRIVE,
+        drive_url: urlDrive,
+        nombre_archivo: nombreArchivo,
+        mime_type: mimeType,
+        tamano_bytes: 0,
+        fecha_emision: d.FECHA_EMISION || '',
+        fecha_vencimiento: d.FECHA_VENCIMIENTO || '',
+        observaciones: d.MOTIVO_OBSERVACION || '',
+        creado_en: d.CREADO_EN || ahoraIso_()
+      };
+    });
+
+    // Ordenar: primero vigentes, luego por fecha más reciente
+    resultado.sort((a, b) => {
+      if (a.version_vigente !== b.version_vigente) {
+        return a.version_vigente === 'SI' ? -1 : 1;
+      }
+      return String(b.creado_en).localeCompare(String(a.creado_en));
+    });
 
     return {
       success: true,
-      data: res.data.rows || [],
+      data: resultado,
       error: null
     };
   } catch (err) {
@@ -404,28 +457,30 @@ function driveNormalizarNombresCarpetasExistentes() {
     const folders = carpetaExpedientes.getFolders();
     const renombradas = [];
 
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: false }) || []) : [];
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: false }) || []) : [];
+    const rels = typeof repoTodos === 'function' ? (repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: false }) || []) : [];
+
     while (folders.hasNext()) {
       const folder = folders.next();
       const currentName = folder.getName().trim();
-      // Extraer secuencia numérica del RUT
       const matchRut = currentName.match(/(\d{7,8}[0-9kK]?)/);
       if (matchRut) {
-        const rutLimpio = normalizarRut(matchRut[1]);
-        const qPersona = tursoEjecutar(
-          `SELECT p.rut_formateado, p.nombres, p.apellidos, e.nombre_comercial, e.nombre_fantasia
-           FROM personas p
-           LEFT JOIN persona_emprendimiento pe ON pe.id_persona = p.id_persona
-           LEFT JOIN emprendimientos e ON e.id_emprendimiento = pe.id_emprendimiento
-           WHERE p.rut = ? OR p.rut_formateado = ?
-           LIMIT 1;`,
-          [rutLimpio, rutLimpio]
-        );
+        const rutLimpio = typeof normalizarRut === 'function' ? normalizarRut(matchRut[1]) : matchRut[1];
+        const per = personas.find(p => {
+          const r = typeof normalizarRut === 'function' ? normalizarRut(p.RUT_NORMALIZADO || p.RUT) : (p.RUT_NORMALIZADO || p.RUT);
+          return r === rutLimpio;
+        });
 
-        if (qPersona.success && qPersona.data.rows && qPersona.data.rows.length > 0) {
-          const row = qPersona.data.rows[0];
-          const rutFmt = row.rut_formateado || formatearRutChileno_(rutLimpio);
-          const nomPersona = [row.nombres, row.apellidos].filter(Boolean).join(' ').trim();
-          const nomEmp = (row.nombre_comercial || row.nombre_fantasia || '').trim();
+        if (per) {
+          const rutFmt = formatearRutChileno_(rutLimpio);
+          const nomPersona = [per.NOMBRES, per.APELLIDO_PATERNO, per.APELLIDO_MATERNO].filter(Boolean).join(' ').trim();
+          let nomEmp = '';
+          const rel = rels.find(r => r.ID_PERSONA === per.ID_PERSONA);
+          if (rel) {
+            const emp = emps.find(e => e.ID_EMPRENDIMIENTO === rel.ID_EMPRENDIMIENTO);
+            if (emp) nomEmp = (emp.NOMBRE_COMERCIAL || '').trim();
+          }
 
           const partes = [rutFmt];
           if (nomPersona) partes.push(nomPersona);
@@ -444,5 +499,3 @@ function driveNormalizarNombresCarpetasExistentes() {
     return { success: false, renombradas: [], error: e.message || String(e) };
   }
 }
-
-

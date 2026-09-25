@@ -705,7 +705,7 @@ function configurarUnidadCompartidaOficial(idCarpetaOpcional) {
 
 /**
  * Crea o sincroniza el Formulario Único Oficial de Postulaciones a Mercados en "Mi Unidad",
- * vinculándolo a las convocatorias abiertas de Turso y configurando la carga de archivos.
+ * vinculándolo a las convocatorias abiertas del sistema y configurando la carga de archivos.
  * Se puede ejecutar directamente desde el menú superior de Apps Script.
  */
 function crearOActualizarFormularioOficial() {

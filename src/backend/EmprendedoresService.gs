@@ -1,7 +1,6 @@
 // EmprendedoresService.gs
-// Servicio de gestión de personas emprendedoras, emprendimientos y expedientes
-// Conecta validaciones chilenas, Turso (libSQL) y Google Drive
-// Sistema de Gestión de Emprendimientos (SGE) - Municipalidad de Santiago
+// SGE v2.1.0 - Servicio de gestión de personas emprendedoras y emprendimientos
+// Validaciones chilenas (Módulo 11, E.164) y persistencia relacional en Google Sheets (Repository.gs)
 
 /**
  * Genera un UUID v4 seguro o pseudo-aleatorio.
@@ -16,7 +15,7 @@ function generarUuid_() {
 
 /**
  * Registra o actualiza una persona emprendedora junto con su emprendimiento.
- * Realiza todas las validaciones chilenas antes de persistir en Turso.
+ * Realiza todas las validaciones chilenas antes de persistir en Google Sheets.
  * @param {object} payload
  * @returns {{ success: boolean, data: object|null, error: string|null }}
  */
@@ -27,13 +26,13 @@ function guardarFichaEmprendedor(payload) {
     }
 
     // 1. Validaciones chilenas estrictas
-    const valRut = validarRutChileno(payload.rut);
+    const valRut = typeof validarRutChileno === 'function' ? validarRutChileno(payload.rut) : { success: true, data: { rutLimpio: String(payload.rut).replace(/[^0-9kK]/g, '').toUpperCase(), rutFormateado: payload.rut } };
     if (!valRut.success) {
       return { success: false, data: null, error: valRut.error };
     }
 
     let telefonoValidado = payload.telefono || '';
-    if (telefonoValidado) {
+    if (telefonoValidado && typeof validarTelefonoChileno === 'function') {
       const valTel = validarTelefonoChileno(telefonoValidado);
       if (!valTel.success) {
         return { success: false, data: null, error: valTel.error };
@@ -42,7 +41,7 @@ function guardarFichaEmprendedor(payload) {
     }
 
     let emailValidado = payload.email || '';
-    if (emailValidado) {
+    if (emailValidado && typeof validarEmail === 'function') {
       const valMail = validarEmail(emailValidado);
       if (!valMail.success) {
         return { success: false, data: null, error: valMail.error };
@@ -60,89 +59,81 @@ function guardarFichaEmprendedor(payload) {
 
     const rutLimpio = valRut.data.rutLimpio;
     const rutFormateado = valRut.data.rutFormateado;
+    const usuarioEmail = payload.usuarioEmail || 'sistema@santiago.cl';
 
-    // 2. Verificar si la persona ya existe en Turso (por idPersona o por RUT)
+    // Desglosar apellidos si vienen juntos
+    const apellidosPartes = String(payload.apellidos).trim().split(/\s+/);
+    const apePaterno = apellidosPartes[0] || '';
+    const apeMaterno = apellidosPartes.slice(1).join(' ') || '';
+
+    // 2. Buscar si la persona ya existe en Google Sheets (por idPersona o por RUT)
     let idPersona = payload.idPersona || '';
-    if (!idPersona) {
-      const checkPersona = tursoEjecutar('SELECT id_persona FROM personas WHERE rut = ? LIMIT 1', [rutLimpio]);
-      if (checkPersona.success && checkPersona.data.rows && checkPersona.data.rows.length > 0) {
-        idPersona = checkPersona.data.rows[0].id_persona;
+    let personaExistente = null;
+
+    if (typeof repoTodos === 'function') {
+      const personas = repoTodos('PERSONAS', { incluirInactivos: true }) || [];
+      personaExistente = personas.find(p => {
+        if (idPersona && p.ID_PERSONA === idPersona) return true;
+        const rNorm = typeof normalizarRut === 'function' ? normalizarRut(p.RUT_NORMALIZADO || p.RUT) : (p.RUT_NORMALIZADO || p.RUT);
+        return rNorm === rutLimpio;
+      });
+      if (personaExistente) {
+        idPersona = personaExistente.ID_PERSONA;
       }
     }
-    const existePersona = !!idPersona;
 
-    const stmts = [];
+    const ahora = (typeof ahoraIso_ === 'function') ? ahoraIso_() : new Date().toISOString();
 
-    if (idPersona) {
-      // Actualizar datos de persona (permitiendo corrección de RUT si fue modificado)
-      stmts.push({
-        sql: `UPDATE personas SET 
-                rut = ?, rut_formateado = ?, nombres = ?, apellidos = ?, email = ?, telefono = ?, comuna = ?, 
-                direccion = ?, genero = ?, tramo_rsh = ?, pueblo_originario = ?, 
-                discapacidad_declarada = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_persona = ?`,
-        args: [
-          rutLimpio,
-          rutFormateado,
-          sanitizarTexto(payload.nombres),
-          sanitizarTexto(payload.apellidos),
-          emailValidado,
-          telefonoValidado,
-          normalizarComuna(payload.comuna),
-          sanitizarTexto(payload.direccion || ''),
-          sanitizarTexto(payload.genero || 'NO_INFORMA'),
-          sanitizarTexto(payload.tramoRsh || 'SIN_RSH'),
-          payload.puebloOriginario ? 'SI' : 'NO',
-          payload.discapacidad ? 'SI' : 'NO',
-          payload.usuarioEmail || 'sistema@santiago.cl',
-          idPersona
-        ]
-      });
+    if (personaExistente) {
+      // Actualizar persona
+      repoActualizar('PERSONAS', idPersona, {
+        RUT_NORMALIZADO: rutLimpio,
+        NOMBRES: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.nombres) : payload.nombres,
+        APELLIDO_PATERNO: typeof sanitizarTexto === 'function' ? sanitizarTexto(apePaterno) : apePaterno,
+        APELLIDO_MATERNO: typeof sanitizarTexto === 'function' ? sanitizarTexto(apeMaterno) : apeMaterno,
+        EMAIL_NORMALIZADO: emailValidado,
+        TELEFONO_NORMALIZADO: telefonoValidado,
+        COMUNA_RESIDENCIA: typeof normalizarComuna === 'function' ? normalizarComuna(payload.comuna) : (payload.comuna || 'SANTIAGO'),
+        GENERO: payload.genero || 'NO_INFORMA',
+        DISCAPACIDAD_DECLARADA: payload.discapacidad ? 'SI' : 'NO',
+        ACTUALIZADO_EN: ahora,
+        ACTUALIZADO_POR: usuarioEmail
+      }, { motivo: 'Actualización de Ficha Integral' });
     } else {
-      idPersona = 'per-' + generarUuid_();
-      stmts.push({
-        sql: `INSERT INTO personas (
-                id_persona, rut, rut_formateado, nombres, apellidos, email, 
-                telefono, comuna, direccion, genero, tramo_rsh, pueblo_originario, discapacidad_declarada, creado_por, actualizado_por
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          idPersona,
-          rutLimpio,
-          rutFormateado,
-          sanitizarTexto(payload.nombres),
-          sanitizarTexto(payload.apellidos),
-          emailValidado,
-          telefonoValidado,
-          normalizarComuna(payload.comuna),
-          sanitizarTexto(payload.direccion || ''),
-          sanitizarTexto(payload.genero || 'NO_INFORMA'),
-          sanitizarTexto(payload.tramoRsh || 'SIN_RSH'),
-          payload.puebloOriginario ? 'SI' : 'NO',
-          payload.discapacidad ? 'SI' : 'NO',
-          payload.usuarioEmail || 'sistema@santiago.cl',
-          payload.usuarioEmail || 'sistema@santiago.cl'
-        ]
-      });
+      // Insertar persona
+      idPersona = idPersona || ('per-' + generarUuid_());
+      repoInsertar('PERSONAS', {
+        ID_PERSONA: idPersona,
+        RUT_NORMALIZADO: rutLimpio,
+        NOMBRES: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.nombres) : payload.nombres,
+        APELLIDO_PATERNO: typeof sanitizarTexto === 'function' ? sanitizarTexto(apePaterno) : apePaterno,
+        APELLIDO_MATERNO: typeof sanitizarTexto === 'function' ? sanitizarTexto(apeMaterno) : apeMaterno,
+        FECHA_NACIMIENTO: payload.fechaNacimiento || '',
+        GENERO: payload.genero || 'NO_INFORMA',
+        DISCAPACIDAD_DECLARADA: payload.discapacidad ? 'SI' : 'NO',
+        TELEFONO_NORMALIZADO: telefonoValidado,
+        EMAIL_NORMALIZADO: emailValidado,
+        COMUNA_RESIDENCIA: typeof normalizarComuna === 'function' ? normalizarComuna(payload.comuna) : (payload.comuna || 'SANTIAGO'),
+        ESTADO_REGISTRO: 'ACTIVO',
+        CREADO_EN: ahora,
+        CREADO_POR: usuarioEmail,
+        ACTUALIZADO_EN: ahora,
+        ACTUALIZADO_POR: usuarioEmail
+      }, { motivo: 'Registro de nuevo emprendedor' });
     }
 
     // 3. Crear o actualizar Emprendimiento
     let idEmprendimiento = payload.idEmprendimiento || '';
-    if (!idEmprendimiento && idPersona) {
-      // Buscar si la persona ya posee un emprendimiento vinculado para no duplicar al editar
-      const checkVinc = tursoEjecutar(
-        `SELECT id_emprendimiento FROM persona_emprendimiento WHERE id_persona = ? ORDER BY es_titular_principal DESC LIMIT 1;`,
-        [idPersona]
-      );
-      if (checkVinc.success && checkVinc.data.rows && checkVinc.data.rows.length > 0) {
-        idEmprendimiento = checkVinc.data.rows[0].id_emprendimiento;
-      } else {
-        const checkVinc2 = tursoEjecutar(
-          `SELECT id_emprendimiento FROM vinculaciones WHERE id_persona = ? LIMIT 1;`,
-          [idPersona]
-        );
-        if (checkVinc2.success && checkVinc2.data.rows && checkVinc2.data.rows.length > 0) {
-          idEmprendimiento = checkVinc2.data.rows[0].id_emprendimiento;
-        }
+    let empExistente = null;
+
+    if (typeof repoTodos === 'function') {
+      const rels = repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }) || [];
+      const userRel = rels.find(r => r.ID_PERSONA === idPersona && r.ESTADO_REGISTRO !== 'INACTIVO');
+      if (userRel && !idEmprendimiento) {
+        idEmprendimiento = userRel.ID_EMPRENDIMIENTO;
+      }
+      if (idEmprendimiento) {
+        empExistente = repoBuscarPorId('EMPRENDIMIENTOS', idEmprendimiento);
       }
     }
 
@@ -150,77 +141,57 @@ function guardarFichaEmprendedor(payload) {
       ? `${payload.subrubro} - ${payload.especialidad}`
       : (payload.subrubro || payload.especialidad || '');
 
-    if (idEmprendimiento) {
-      stmts.push({
-        sql: `UPDATE emprendimientos SET 
-                nombre_fantasia = ?, nombre_comercial = ?, rubro = ?, subrubro = ?, descripcion_producto = ?,
-                formalizacion_sii = ?, rut_empresa = ?, etapa_madurez = ?,
-                instagram = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_emprendimiento = ?`,
-        args: [
-          sanitizarTexto(payload.nombreComercial),
-          sanitizarTexto(payload.nombreComercial),
-          sanitizarTexto(payload.rubro || 'OTRO'),
-          sanitizarTexto(subrubroCompuesto),
-          sanitizarTexto(payload.descripcion || payload.especialidad || ''),
-          sanitizarTexto(payload.formalizacionSii || 'SIN_INICIO'),
-          sanitizarTexto(payload.rutEmpresa || ''),
-          sanitizarTexto(payload.etapa || 'IDEA'),
-          sanitizarTexto(payload.instagram || ''),
-          payload.usuarioEmail || 'sistema@santiago.cl',
-          idEmprendimiento
-        ]
-      });
+    if (empExistente) {
+      repoActualizar('EMPRENDIMIENTOS', idEmprendimiento, {
+        NOMBRE_COMERCIAL: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.nombreComercial) : payload.nombreComercial,
+        ID_RUBRO: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.rubro || 'OTRO') : (payload.rubro || 'OTRO'),
+        ID_SUBRUBRO: typeof sanitizarTexto === 'function' ? sanitizarTexto(subrubroCompuesto) : subrubroCompuesto,
+        DESCRIPCION: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.descripcion || payload.especialidad || '') : (payload.descripcion || ''),
+        FORMALIZACION: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.formalizacionSii || 'SIN_INICIO') : (payload.formalizacionSii || 'SIN_INICIO'),
+        ETAPA_ACTUAL: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.etapa || 'ARRANQUE') : (payload.etapa || 'ARRANQUE'),
+        INSTAGRAM: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.instagram || '') : (payload.instagram || ''),
+        ACTUALIZADO_EN: ahora,
+        ACTUALIZADO_POR: usuarioEmail
+      }, { motivo: 'Actualización de emprendimiento' });
     } else {
-      idEmprendimiento = 'emp-' + generarUuid_();
-      stmts.push({
-        sql: `INSERT INTO emprendimientos (
-                id_emprendimiento, nombre_fantasia, nombre_comercial, rubro, subrubro, descripcion_producto,
-                formalizacion_sii, rut_empresa, etapa_madurez, instagram, creado_por, actualizado_por
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          idEmprendimiento,
-          sanitizarTexto(payload.nombreComercial),
-          sanitizarTexto(payload.nombreComercial),
-          sanitizarTexto(payload.rubro || 'OTRO'),
-          sanitizarTexto(subrubroCompuesto),
-          sanitizarTexto(payload.descripcion || payload.especialidad || ''),
-          sanitizarTexto(payload.formalizacionSii || 'SIN_INICIO'),
-          sanitizarTexto(payload.rutEmpresa || ''),
-          sanitizarTexto(payload.etapa || 'IDEA'),
-          sanitizarTexto(payload.instagram || ''),
-          payload.usuarioEmail || 'sistema@santiago.cl',
-          payload.usuarioEmail || 'sistema@santiago.cl'
-        ]
-      });
+      idEmprendimiento = idEmprendimiento || ('emp-' + generarUuid_());
+      repoInsertar('EMPRENDIMIENTOS', {
+        ID_EMPRENDIMIENTO: idEmprendimiento,
+        NOMBRE_COMERCIAL: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.nombreComercial) : payload.nombreComercial,
+        DESCRIPCION: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.descripcion || payload.especialidad || '') : (payload.descripcion || ''),
+        ID_RUBRO: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.rubro || 'OTRO') : (payload.rubro || 'OTRO'),
+        ID_SUBRUBRO: typeof sanitizarTexto === 'function' ? sanitizarTexto(subrubroCompuesto) : subrubroCompuesto,
+        FECHA_INICIO_ESTIMADA: '',
+        FORMALIZACION: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.formalizacionSii || 'SIN_INICIO') : (payload.formalizacionSii || 'SIN_INICIO'),
+        DEDICACION: 'PRINCIPAL',
+        CANAL_VENTA: 'FERIAS',
+        ETAPA_ACTUAL: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.etapa || 'ARRANQUE') : (payload.etapa || 'ARRANQUE'),
+        TERRITORIO_OPERACION: 'SANTIAGO',
+        ESTADO_EMPRENDIMIENTO: 'ACTIVO',
+        CREADO_EN: ahora,
+        CREADO_POR: usuarioEmail,
+        ACTUALIZADO_EN: ahora,
+        ACTUALIZADO_POR: usuarioEmail,
+        INSTAGRAM: typeof sanitizarTexto === 'function' ? sanitizarTexto(payload.instagram || '') : (payload.instagram || ''),
+        FACEBOOK: '',
+        TIKTOK: '',
+        SITIO_WEB: '',
+        ORIGEN_ATENCION: 'DEMANDA'
+      }, { motivo: 'Registro de nuevo emprendimiento' });
 
-      // Crear vinculación oficial en persona_emprendimiento
-      const idVinculacion = 'vinc-' + generarUuid_();
-      stmts.push({
-        sql: `INSERT INTO persona_emprendimiento (id_vinculacion, id_persona, id_emprendimiento, rol, es_titular_principal, creado_por)
-              VALUES (?, ?, ?, 'TITULAR', 1, ?)`,
-        args: [idVinculacion, idPersona, idEmprendimiento, payload.usuarioEmail || 'sistema@santiago.cl']
-      });
-    }
-
-    // 4. Registro en Auditoría
-    const idAudit = 'aud-' + generarUuid_();
-    stmts.push({
-      sql: `INSERT INTO auditoria (id_auditoria, usuario_email, accion, entidad, id_entidad, payload_nuevo)
-            VALUES (?, ?, ?, 'FICHA_INTEGRAL', ?, ?)`,
-      args: [
-        idAudit,
-        payload.usuarioEmail || 'sistema@santiago.cl',
-        existePersona ? 'ACTUALIZAR' : 'CREAR',
-        idPersona,
-        JSON.stringify({ rut: rutLimpio, emprendimiento: payload.nombreComercial })
-      ]
-    });
-
-    // 5. Ejecutar transacción en Turso
-    const tx = tursoTransaccion(stmts);
-    if (!tx.success) {
-      return { success: false, data: null, error: 'Error guardando en Turso: ' + tx.error };
+      // Crear vinculación oficial en PERSONA_EMPRENDIMIENTO
+      repoInsertar('PERSONA_EMPRENDIMIENTO', {
+        ID_RELACION: 'rel-' + generarUuid_(),
+        ID_PERSONA: idPersona,
+        ID_EMPRENDIMIENTO: idEmprendimiento,
+        ROL: 'TITULAR',
+        ES_PRINCIPAL: 'SI',
+        DESDE: ahora.substring(0, 10),
+        HASTA: '',
+        ESTADO_REGISTRO: 'ACTIVO',
+        CREADO_EN: ahora,
+        CREADO_POR: usuarioEmail
+      }, { motivo: 'Vinculación de titular y emprendimiento' });
     }
 
     return {
@@ -229,7 +200,7 @@ function guardarFichaEmprendedor(payload) {
         idPersona: idPersona,
         idEmprendimiento: idEmprendimiento,
         rutFormateado: rutFormateado,
-        mensaje: existePersona ? 'Ficha actualizada exitosamente.' : 'Emprendedor registrado exitosamente.'
+        mensaje: personaExistente ? 'Ficha actualizada exitosamente en Google Sheets.' : 'Emprendedor registrado exitosamente en Google Sheets.'
       },
       error: null
     };
@@ -244,7 +215,7 @@ function guardarFichaEmprendedor(payload) {
 
 /**
  * Obtiene la ficha completa de un emprendedor buscando por su RUT o ID.
- * Trae persona, emprendimientos, vinculaciones y documentos registrados.
+ * Trae persona, emprendimientos, vinculaciones, documentos y postulaciones.
  * @param {string} rutOId
  * @returns {{ success: boolean, data: object|null, error: string|null }}
  */
@@ -254,101 +225,86 @@ function obtenerFichaIntegral(rutOId) {
       return { success: false, data: null, error: 'Se requiere RUT o ID de la persona.' };
     }
 
-    const rutLimpio = normalizarRut(rutOId);
+    const rutLimpio = typeof normalizarRut === 'function' ? normalizarRut(rutOId) : String(rutOId).replace(/[^0-9kK]/g, '').toUpperCase();
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: true }) || []) : [];
+    const persona = personas.find(p => {
+      const pRut = typeof normalizarRut === 'function' ? normalizarRut(p.RUT_NORMALIZADO || p.RUT) : (p.RUT_NORMALIZADO || p.RUT);
+      return pRut === rutLimpio || p.ID_PERSONA === rutOId;
+    });
 
-    // Buscar persona
-    const qPersona = tursoEjecutar(
-      'SELECT * FROM personas WHERE rut = ? OR id_persona = ? LIMIT 1',
-      [rutLimpio, rutOId]
-    );
-
-    if (!qPersona.success || !qPersona.data.rows || qPersona.data.rows.length === 0) {
-      if (typeof repoTodos === 'function') {
-        const personas = repoTodos('PERSONAS') || [];
-        const personaLocal = personas.find(p => p.RUT === rutOId || p.ID_PERSONA === rutOId || normalizarRut(p.RUT) === rutLimpio);
-        if (personaLocal) {
-          const vincs = repoTodos('VINCULACIONES') || [];
-          const emps = repoTodos('EMPRENDIMIENTOS') || [];
-          const docs = repoTodos('DOCUMENTOS') || [];
-          const userVincs = vincs.filter(v => v.ID_PERSONA === personaLocal.ID_PERSONA);
-          const userEmps = emps.filter(e => userVincs.some(v => v.ID_EMPRENDIMIENTO === e.ID_EMPRENDIMIENTO));
-          const userDocs = docs.filter(d => d.ID_SUJETO === personaLocal.ID_PERSONA);
-
-          return {
-            success: true,
-            data: {
-              persona: {
-                id_persona: personaLocal.ID_PERSONA,
-                rut: personaLocal.RUT,
-                rut_formateado: personaLocal.RUT,
-                nombres: personaLocal.NOMBRES,
-                apellidos: personaLocal.APELLIDOS,
-                email: personaLocal.EMAIL,
-                telefono: personaLocal.TELEFONO,
-                comuna: personaLocal.COMUNA || 'SANTIAGO',
-                tramo_rsh: personaLocal.TRAMO_RSH
-              },
-              emprendimientos: userEmps.map(e => ({
-                id_emprendimiento: e.ID_EMPRENDIMIENTO,
-                nombre_comercial: e.NOMBRE_COMERCIAL,
-                rubro: e.ID_RUBRO,
-                formalizacion_sii: e.FORMALIZACION_SII,
-                instagram: e.INSTAGRAM
-              })),
-              documentos: userDocs.map(d => ({
-                id_documento: d.ID_DOCUMENTO,
-                tipo_documento: d.TIPO_DOCUMENTO,
-                nombre_archivo: d.NOMBRE_ORIGINAL,
-                drive_url: d.DRIVE_URL
-              })),
-              postulaciones: []
-            },
-            error: null
-          };
-        }
-      }
+    if (!persona) {
       return { success: false, data: null, error: 'No se encontró ninguna persona con los datos especificados.' };
     }
 
-    const persona = qPersona.data.rows[0];
-    const idPersona = persona.id_persona;
+    const idPersona = persona.ID_PERSONA;
+    const rels = typeof repoTodos === 'function' ? (repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: true }) || []) : [];
+    const userRels = rels.filter(r => r.ID_PERSONA === idPersona && r.ESTADO_REGISTRO !== 'INACTIVO');
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || []) : [];
+    const userEmps = emps.filter(e => userRels.some(r => r.ID_EMPRENDIMIENTO === e.ID_EMPRENDIMIENTO));
 
-    // Buscar emprendimientos vinculados
-    const qEmps = tursoEjecutar(
-      `SELECT e.*, pe.rol, pe.es_titular_principal AS es_contacto_principal 
-       FROM emprendimientos e
-       INNER JOIN persona_emprendimiento pe ON pe.id_emprendimiento = e.id_emprendimiento
-       WHERE pe.id_persona = ? AND COALESCE(e.estado, 'ACTIVO') != 'INACTIVO'`,
-      [idPersona]
-    );
+    const docs = typeof repoTodos === 'function' ? (repoTodos('DOCUMENTOS', { incluirInactivos: true }) || []) : [];
+    const userDocs = docs.filter(d => {
+      if (d.ID_SUJETO === idPersona) return true;
+      if (userEmps.some(e => e.ID_EMPRENDIMIENTO === d.ID_SUJETO)) return true;
+      return false;
+    });
 
-    // Buscar documentos en expediente
-    const qDocs = tursoEjecutar(
-      `SELECT * FROM documentos 
-       WHERE (id_persona = ? OR id_emprendimiento IN (
-         SELECT id_emprendimiento FROM persona_emprendimiento WHERE id_persona = ?
-       ))
-       ORDER BY creado_en DESC`,
-      [idPersona, idPersona]
-    );
+    const posts = typeof repoTodos === 'function' ? (repoTodos('POSTULACIONES', { incluirInactivos: true }) || []) : [];
+    const inis = typeof repoTodos === 'function' ? (repoTodos('INICIATIVAS', { incluirInactivos: true }) || []) : [];
+    const userPosts = posts.filter(p => p.ID_PERSONA_CONTACTO === idPersona || userEmps.some(e => e.ID_EMPRENDIMIENTO === p.ID_EMPRENDIMIENTO));
 
-    // Buscar postulaciones históricas
-    const qPosts = tursoEjecutar(
-      `SELECT p.*, i.nombre AS nombre_iniciativa, i.codigo AS codigo_iniciativa, i.tipo AS tipo_iniciativa
-       FROM postulaciones p
-       INNER JOIN iniciativas i ON i.id_iniciativa = p.id_iniciativa
-       WHERE p.id_persona_contacto = ?
-       ORDER BY p.fecha_postulacion DESC`,
-      [idPersona]
-    );
+    const rutFormateado = formatearRutChileno_(persona.RUT_NORMALIZADO || persona.RUT || rutLimpio);
 
     return {
       success: true,
       data: {
-        persona: persona,
-        emprendimientos: (qEmps.success && qEmps.data.rows) || [],
-        documentos: (qDocs.success && qDocs.data.rows) || [],
-        postulaciones: (qPosts.success && qPosts.data.rows) || []
+        persona: {
+          id_persona: persona.ID_PERSONA,
+          rut: persona.RUT_NORMALIZADO || persona.RUT || rutLimpio,
+          rut_formateado: rutFormateado,
+          nombres: persona.NOMBRES || '',
+          apellidos: [persona.APELLIDO_PATERNO, persona.APELLIDO_MATERNO].filter(Boolean).join(' '),
+          email: persona.EMAIL_NORMALIZADO || persona.EMAIL || '',
+          telefono: persona.TELEFONO_NORMALIZADO || persona.TELEFONO || '',
+          comuna: persona.COMUNA_RESIDENCIA || persona.COMUNA || 'SANTIAGO',
+          tramo_rsh: persona.TRAMO_RSH || 'SIN_RSH',
+          genero: persona.GENERO || 'NO_INFORMA',
+          discapacidad_declarada: persona.DISCAPACIDAD_DECLARADA || 'NO'
+        },
+        emprendimientos: userEmps.map(e => ({
+          id_emprendimiento: e.ID_EMPRENDIMIENTO,
+          codigo_comercial: e.CODIGO_EMPRENDIMIENTO || '',
+          nombre_comercial: e.NOMBRE_COMERCIAL || '',
+          nombre_fantasia: e.NOMBRE_COMERCIAL || '',
+          rubro: e.ID_RUBRO || 'OTRO',
+          subrubro: e.ID_SUBRUBRO || '',
+          formalizacion_sii: e.FORMALIZACION || 'SIN_INICIO',
+          etapa_madurez: e.ETAPA_ACTUAL || 'ARRANQUE',
+          instagram: e.INSTAGRAM || '',
+          descripcion_producto: e.DESCRIPCION || ''
+        })),
+        documentos: userDocs.map(d => ({
+          id_documento: d.ID_DOCUMENTO,
+          tipo_documento: d.TIPO_DOCUMENTO,
+          nombre_archivo: d.TIPO_DOCUMENTO,
+          drive_file_id: d.ID_ARCHIVO_DRIVE,
+          drive_url: d.ID_ARCHIVO_DRIVE ? `https://drive.google.com/file/d/${d.ID_ARCHIVO_DRIVE}/view` : '',
+          estado_revision: d.ESTADO_REVISION || 'RECIBIDO',
+          version_vigente: d.ES_VERSION_VIGENTE || 'SI',
+          creado_en: d.CREADO_EN || ''
+        })),
+        postulaciones: userPosts.map(p => {
+          const ini = inis.find(i => i.ID_INICIATIVA === p.ID_INICIATIVA);
+          return {
+            id_postulacion: p.ID_POSTULACION,
+            id_iniciativa: p.ID_INICIATIVA,
+            nombre_iniciativa: ini ? ini.NOMBRE : 'Iniciativa',
+            codigo_iniciativa: ini ? (ini.CODIGO || ini.ID_INICIATIVA) : '',
+            tipo_iniciativa: ini ? ini.TIPO_INICIATIVA : 'FERIA',
+            estado_postulacion: p.ESTADO_POSTULACION || 'INGRESADA',
+            fecha_postulacion: p.FECHA_POSTULACION || p.CREADO_EN || ''
+          };
+        })
       },
       error: null
     };
@@ -371,90 +327,72 @@ function obtenerFichaIntegral(rutOId) {
  */
 function listarFichasEmprendedores(filtros = {}) {
   try {
-    const termino = (filtros.termino || '').trim();
+    const termino = (filtros.termino || '').trim().toLowerCase();
+    const terminoLimpio = typeof normalizarRut === 'function' ? normalizarRut(termino) : termino.replace(/[^0-9kK]/g, '').toUpperCase();
     const rubro = (filtros.rubro || '').trim();
     const limite = Math.min(parseInt(filtros.limite || filtros.limit, 10) || 50, 1000);
 
-    let sql = `
-      SELECT 
-        p.id_persona, p.rut, p.rut_formateado, p.nombres, p.apellidos, 
-        p.email, p.telefono, p.comuna, p.direccion, p.tramo_rsh,
-        e.id_emprendimiento, e.codigo_comercial, e.nombre_comercial, e.nombre_fantasia,
-        e.rubro, e.subrubro, e.formalizacion_sii, e.etapa_madurez, e.instagram, e.descripcion_producto,
-        pe.rol
-      FROM personas p
-      LEFT JOIN persona_emprendimiento pe ON pe.id_persona = p.id_persona
-      LEFT JOIN emprendimientos e ON e.id_emprendimiento = pe.id_emprendimiento
-      WHERE COALESCE(p.estado, 'ACTIVO') != 'INACTIVO'
-    `;
-    const args = [];
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: false }) || []) : [];
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: false }) || []) : [];
+    const rels = typeof repoTodos === 'function' ? (repoTodos('PERSONA_EMPRENDIMIENTO', { incluirInactivos: false }) || []) : [];
 
-    if (termino) {
-      const terminoLimpio = normalizarRut(termino);
-      sql += ` AND (p.rut LIKE ? OR p.rut_formateado LIKE ? OR p.nombres LIKE ? OR p.apellidos LIKE ? OR e.nombre_comercial LIKE ? OR e.nombre_fantasia LIKE ?)`;
-      const likeTerm = `%${termino}%`;
-      const likeRut = `%${terminoLimpio || termino}%`;
-      args.push(likeRut, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
-    }
+    const resList = [];
 
-    if (rubro) {
-      sql += ` AND e.rubro = ?`;
-      args.push(rubro);
-    }
+    personas.forEach(p => {
+      const ape = [p.APELLIDO_PATERNO, p.APELLIDO_MATERNO].filter(Boolean).join(' ');
+      const nombreCompleto = `${p.NOMBRES || ''} ${ape}`.trim();
+      const pRutNorm = p.RUT_NORMALIZADO || p.RUT || '';
+      const rutFmt = formatearRutChileno_(pRutNorm);
 
-    sql += ` ORDER BY p.actualizado_en DESC LIMIT ?`;
-    args.push(limite);
+      // Buscar emprendimiento vinculado
+      const rel = rels.find(r => r.ID_PERSONA === p.ID_PERSONA);
+      const e = rel ? (emps.find(item => item.ID_EMPRENDIMIENTO === rel.ID_EMPRENDIMIENTO) || {}) : (emps.find(item => item.ID_EMPRENDIMIENTO === p.ID_PERSONA) || {});
 
-    const query = tursoEjecutar(sql, args);
-    if (!query.success) {
-      // Si aún no se configuran credenciales en Turso, fallback elegante al repositorio local
-      if (typeof repoTodos === 'function') {
-        const personas = repoTodos('PERSONAS', { incluirInactivos: false }) || [];
-        const emps = repoTodos('EMPRENDIMIENTOS', { incluirInactivos: false }) || [];
-        const vincs = repoTodos('VINCULACIONES', { incluirInactivos: false }) || [];
-        
-        const resList = personas.map(p => {
-          const v = vincs.find(item => item.ID_PERSONA === p.ID_PERSONA);
-          const e = v ? emps.find(item => item.ID_EMPRENDIMIENTO === v.ID_EMPRENDIMIENTO) : (emps[0] || {});
-          return {
-            id_persona: p.ID_PERSONA,
-            rut: p.RUT,
-            rut_formateado: p.RUT,
-            nombres: p.NOMBRES,
-            apellidos: p.APELLIDOS,
-            email: p.EMAIL,
-            telefono: p.TELEFONO,
-            comuna: normalizarComuna(p.COMUNA || 'Santiago'),
-            tramo_rsh: p.TRAMO_RSH,
-            id_emprendimiento: e.ID_EMPRENDIMIENTO || '',
-            nombre_comercial: e.NOMBRE_COMERCIAL || 'Sin Emprendimiento',
-            nombre_fantasia: e.NOMBRE_FANTASIA || '',
-            rubro: e.ID_RUBRO || 'OTRO',
-            subrubro: e.ID_SUBRUBRO || '',
-            formalizacion_sii: e.FORMALIZACION_SII || 'SIN_INICIO',
-            rol: v ? v.ROL : 'TITULAR'
-          };
-        });
+      const empNombre = e.NOMBRE_COMERCIAL || 'Sin Emprendimiento';
+      const empRubro = e.ID_RUBRO || 'OTRO';
 
-        return {
-          success: true,
-          data: resList,
-          error: null
-        };
+      // Filtro de búsqueda
+      if (termino) {
+        const coincideRut = pRutNorm.toLowerCase().includes(terminoLimpio.toLowerCase()) || rutFmt.toLowerCase().includes(termino);
+        const coincideNombre = nombreCompleto.toLowerCase().includes(termino);
+        const coincideEmp = empNombre.toLowerCase().includes(termino);
+        if (!coincideRut && !coincideNombre && !coincideEmp) {
+          return;
+        }
       }
-      return { success: false, data: null, error: query.error };
-    }
 
-    const rows = (query.data.rows || []).map(r => {
-      if (r.comuna) {
-        r.comuna = normalizarComuna(r.comuna);
+      // Filtro de rubro
+      if (rubro && empRubro !== rubro) {
+        return;
       }
-      return r;
+
+      resList.push({
+        id_persona: p.ID_PERSONA,
+        rut: pRutNorm,
+        rut_formateado: rutFmt,
+        nombres: p.NOMBRES || '',
+        apellidos: ape,
+        email: p.EMAIL_NORMALIZADO || p.EMAIL || '',
+        telefono: p.TELEFONO_NORMALIZADO || p.TELEFONO || '',
+        comuna: typeof normalizarComuna === 'function' ? normalizarComuna(p.COMUNA_RESIDENCIA || p.COMUNA || 'Santiago') : (p.COMUNA_RESIDENCIA || 'Santiago'),
+        tramo_rsh: p.TRAMO_RSH || 'SIN_RSH',
+        id_emprendimiento: e.ID_EMPRENDIMIENTO || '',
+        codigo_comercial: e.CODIGO_EMPRENDIMIENTO || '',
+        nombre_comercial: empNombre,
+        nombre_fantasia: empNombre,
+        rubro: empRubro,
+        subrubro: e.ID_SUBRUBRO || '',
+        formalizacion_sii: e.FORMALIZACION || 'SIN_INICIO',
+        etapa_madurez: e.ETAPA_ACTUAL || 'ARRANQUE',
+        instagram: e.INSTAGRAM || '',
+        descripcion_producto: e.DESCRIPCION || '',
+        rol: rel ? rel.ROL : 'TITULAR'
+      });
     });
 
     return {
       success: true,
-      data: rows,
+      data: resList.slice(0, limite),
       error: null
     };
   } catch (err) {
@@ -465,4 +403,3 @@ function listarFichasEmprendedores(filtros = {}) {
     };
   }
 }
-

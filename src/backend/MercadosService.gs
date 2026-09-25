@@ -929,31 +929,17 @@ function sincronizarMercadosEnFormularioUnico_() {
     try { form.moveItem(selectorItem.getIndex(), 0); } catch (ignored) {}
   }
   
-  // 1. Obtener iniciativas abiertas desde Turso
+  // 1. Obtener iniciativas abiertas desde Google Sheets
   let abiertas = [];
   try {
-    if (typeof tursoEjecutar === 'function') {
-      const qTurso = tursoEjecutar("SELECT id_iniciativa, nombre FROM iniciativas WHERE estado IN ('ABIERTA', 'PUBLICADA', 'EN_EVALUACION');");
-      if (qTurso && qTurso.success && qTurso.data && Array.isArray(qTurso.data.rows)) {
-        abiertas = qTurso.data.rows.map(function(r) {
-          return { ID_INICIATIVA: r.id_iniciativa, NOMBRE: r.nombre };
-        });
-      }
-    }
+    const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: false });
+    abiertas = iniciativas.filter(function(i) {
+      return ['ABIERTA', 'PUBLICADA', 'EN_EVALUACION'].indexOf(i.ESTADO) >= 0;
+    }).map(function(i) {
+      return { ID_INICIATIVA: i.ID_INICIATIVA, NOMBRE: i.NOMBRE };
+    });
   } catch (e) {
-    Logger.log('Aviso consulta Turso en sincronización: ' + e.message);
-  }
-  
-  // 2. Si Turso no retornó o no está activo, usar Google Sheets como respaldo
-  if (abiertas.length === 0) {
-    try {
-      const iniciativas = repoTodos('INICIATIVAS', { incluirInactivos: false });
-      abiertas = iniciativas.filter(function(i) {
-        return i.ESTADO === 'ABIERTA';
-      }).map(function(i) {
-        return { ID_INICIATIVA: i.ID_INICIATIVA, NOMBRE: i.NOMBRE };
-      });
-    } catch (e) {}
+    Logger.log('Aviso consulta iniciativas en sincronización: ' + e.message);
   }
   
   const formUrl = form.getPublishedUrl();
@@ -967,13 +953,8 @@ function sincronizarMercadosEnFormularioUnico_() {
     fijarOpcionesItemFormulario_(selectorItem, opciones);
     habilitarRespuestasFormulario_(form);
     
-    // Actualizar URL del formulario en Turso y en Sheets
+    // Actualizar URL del formulario en Google Sheets
     abiertas.forEach(function(i) {
-      try {
-        if (typeof tursoEjecutar === 'function') {
-          tursoEjecutar("UPDATE iniciativas SET url_formulario = ? WHERE id_iniciativa = ?;", [formUrl, i.ID_INICIATIVA]);
-        }
-      } catch (ignored) {}
       try {
         repoActualizar('INICIATIVAS', i.ID_INICIATIVA, { URL_FORMULARIO_POSTULACION: formUrl }, { motivo: 'Vinculación a Formulario Único Oficial' });
       } catch (ignored) {}
@@ -1104,16 +1085,6 @@ function procesarPostulacionMercadoFormulario(e) {
       // Fallback resiliente: vincular a la primera iniciativa abierta si no se especifica
       if (!idIniciativa) {
         try {
-          if (typeof tursoEjecutar === 'function') {
-            const qIni = tursoEjecutar("SELECT id_iniciativa FROM iniciativas WHERE estado IN ('ABIERTA', 'PUBLICADA') ORDER BY creado_en DESC LIMIT 1;");
-            if (qIni && qIni.success && qIni.data && qIni.data.rows && qIni.data.rows.length > 0) {
-              idIniciativa = qIni.data.rows[0].id_iniciativa;
-            }
-          }
-        } catch (ignored) {}
-      }
-      if (!idIniciativa) {
-        try {
           const abiertas = repoTodos('INICIATIVAS', { incluirInactivos: false }).filter(function(i) { return i.ESTADO === 'ABIERTA'; });
           if (abiertas.length > 0) idIniciativa = abiertas[0].ID_INICIATIVA;
         } catch (ignored) {}
@@ -1225,108 +1196,55 @@ function procesarPostulacionMercadoFormulario(e) {
         });
       }
 
-      // === SINCRONIZACIÓN CON TURSO (Base de Datos Relacional) ===
+      // === ALMACENAMIENTO DOCUMENTAL EN GOOGLE DRIVE Y GOOGLE SHEETS ===
       try {
-        if (typeof tursoEjecutar === 'function') {
-          // 1. Guardar o actualizar Ficha en Turso con validaciones chilenas
-          const tursoPayload = {
-            rut: personaData.RUT,
-            nombres: personaData.NOMBRES,
-            apellidos: ((personaData.APELLIDO_PATERNO || '') + ' ' + (personaData.APELLIDO_MATERNO || '')).trim(),
-            email: personaData.EMAIL || '',
-            telefono: personaData.TELEFONO || '',
-            comuna: personaData.COMUNA_RESIDENCIA || 'SANTIAGO',
-            nombreComercial: empData.NOMBRE_COMERCIAL,
-            rubro: empData.ID_RUBRO,
-            subrubro: empData.ID_SUBRUBRO || '',
-            formalizacionSii: empData.FORMALIZACION || 'SIN_INICIO',
-            instagram: empData.INSTAGRAM || '',
-            descripcionProducto: empData.DESCRIPCION || '',
-            usuarioEmail: 'FORMULARIO_MERCADO'
-          };
-          
-          if (typeof guardarFichaEmprendedor === 'function') {
-            const tursoFicha = guardarFichaEmprendedor(tursoPayload);
-            if (tursoFicha && tursoFicha.success && tursoFicha.data) {
-              const idPerTurso = tursoFicha.data.idPersona;
-              const idEmpTurso = tursoFicha.data.idEmprendimiento;
-
-              // 2. Insertar o actualizar Postulación en Turso
-              const qCheckPost = tursoEjecutar(
-                "SELECT id_postulacion FROM postulaciones WHERE id_iniciativa = ? AND id_emprendimiento = ? LIMIT 1;",
-                [idIniciativa, idEmpTurso]
-              );
-              if (qCheckPost && qCheckPost.success && qCheckPost.data && qCheckPost.data.rows && qCheckPost.data.rows.length > 0) {
-                tursoEjecutar(
-                  "UPDATE postulaciones SET id_persona_contacto = ?, estado_postulacion = 'INGRESADA', actualizado_en = datetime('now') WHERE id_postulacion = ?;",
-                  [idPerTurso, qCheckPost.data.rows[0].id_postulacion]
-                );
-              } else {
-                tursoEjecutar(
-                  `INSERT INTO postulaciones (
-                    id_postulacion, id_iniciativa, id_emprendimiento, id_persona_contacto,
-                    fecha_postulacion, estado_postulacion, observaciones, creado_por, creado_en
-                  ) VALUES (?, ?, ?, ?, datetime('now'), 'INGRESADA', ?, 'FORMULARIO_MERCADO', datetime('now'));`,
-                  ['post-' + Utilities.getUuid(), idIniciativa, idEmpTurso, idPerTurso, 'Postulación recibida desde Formulario Oficial de Google']
-                );
-              }
-
-              // 3. Procesar documentos cargados: mover a carpetas organizadas y registrar en Turso
-              const todosLosArchivos = {};
-              if (typeof DOCUMENTOS_FORMULARIO_REGISTRO !== 'undefined') {
-                DOCUMENTOS_FORMULARIO_REGISTRO.forEach(function(config) {
-                  const rawAns = respuestaDocumentoFormulario_(answers, config);
-                  const fileIds = idsArchivosRespuestaFormulario_(rawAns);
-                  fileIds.forEach(function(fid) {
-                    todosLosArchivos[fid] = config.tipoDocumento || 'CEDULA_IDENTIDAD_COMPLETA';
-                  });
-                });
-              }
-
-              // También detectar archivos en cualquier otra pregunta con upload
-              Object.keys(answers || {}).forEach(function(tituloPregunta) {
-                const ids = idsArchivosRespuestaFormulario_(answers[tituloPregunta]);
-                ids.forEach(function(fid) {
-                  if (!todosLosArchivos[fid]) {
-                    const t = String(tituloPregunta).toLowerCase();
-                    let td = 'DOCUMENTO_POSTULACION';
-                    if (t.includes('cedula') || t.includes('cédula') || t.includes('identidad') || t.includes('carnet')) td = 'CEDULA_IDENTIDAD_COMPLETA';
-                    else if (t.includes('rsh') || t.includes('hogar') || t.includes('social')) td = 'REGISTRO_SOCIAL_HOGARES';
-                    else if (t.includes('discapacidad') || t.includes('invalidez')) td = 'ACREDITACION_DISCAPACIDAD';
-                    else if (t.includes('inicio') || t.includes('actividad') || t.includes('sii') || t.includes('patente')) td = 'INICIO_ACTIVIDADES';
-                    else if (t.includes('ficha') || t.includes('producto') || t.includes('servicio') || t.includes('foto')) td = 'FICHA_TECNICA_PRODUCTOS';
-                    todosLosArchivos[fid] = td;
-                  }
-                });
-              });
-
-              Object.keys(todosLosArchivos).forEach(function(fid) {
-                try {
-                  const fDrive = DriveApp.getFileById(fid);
-                  if (typeof cargarDocumentoExpediente === 'function') {
-                    const resDoc = cargarDocumentoExpediente({
-                      rut: personaData.RUT,
-                      tipoDocumento: todosLosArchivos[fid],
-                      archivo: fDrive.getBlob(),
-                      nombrePersona: ((personaData.NOMBRES || '') + ' ' + (personaData.APELLIDO_PATERNO || '') + ' ' + (personaData.APELLIDO_MATERNO || '')).trim(),
-                      nombreEmprendimiento: empData.NOMBRE_COMERCIAL || '',
-                      usuarioEmail: 'FORMULARIO_MERCADO'
-                    });
-                    if (resDoc && !resDoc.success) {
-                      Logger.log('Aviso cargarDocumentoExpediente: ' + resDoc.error);
-                    }
-                  }
-                } catch (errDoc) {
-                  Logger.log('Aviso al procesar documento para Turso: ' + errDoc.message);
-                }
-              });
-            } else {
-              Logger.log('Aviso: guardarFichaEmprendedor no tuvo éxito: ' + (tursoFicha ? tursoFicha.error : 'Sin datos'));
-            }
-          }
+        const todosLosArchivos = {};
+        if (typeof DOCUMENTOS_FORMULARIO_REGISTRO !== 'undefined') {
+          DOCUMENTOS_FORMULARIO_REGISTRO.forEach(function(config) {
+            const rawAns = respuestaDocumentoFormulario_(answers, config);
+            const fileIds = idsArchivosRespuestaFormulario_(rawAns);
+            fileIds.forEach(function(fid) {
+              todosLosArchivos[fid] = config.tipoDocumento || 'CEDULA_IDENTIDAD_COMPLETA';
+            });
+          });
         }
-      } catch (errTurso) {
-        Logger.log('Error general al sincronizar postulación con Turso: ' + errTurso.message);
+
+        // También detectar archivos en cualquier otra pregunta con upload
+        Object.keys(answers || {}).forEach(function(tituloPregunta) {
+          const ids = idsArchivosRespuestaFormulario_(answers[tituloPregunta]);
+          ids.forEach(function(fid) {
+            if (!todosLosArchivos[fid]) {
+              const t = String(tituloPregunta).toLowerCase();
+              let td = 'DOCUMENTO_POSTULACION';
+              if (t.includes('cedula') || t.includes('cédula') || t.includes('identidad') || t.includes('carnet')) td = 'CEDULA_IDENTIDAD_COMPLETA';
+              else if (t.includes('rsh') || t.includes('hogar') || t.includes('social')) td = 'REGISTRO_SOCIAL_HOGARES';
+              else if (t.includes('discapacidad') || t.includes('invalidez')) td = 'ACREDITACION_DISCAPACIDAD';
+              else if (t.includes('inicio') || t.includes('actividad') || t.includes('sii') || t.includes('patente')) td = 'INICIO_ACTIVIDADES';
+              else if (t.includes('ficha') || t.includes('producto') || t.includes('servicio') || t.includes('foto')) td = 'FICHA_TECNICA_PRODUCTOS';
+              todosLosArchivos[fid] = td;
+            }
+          });
+        });
+
+        Object.keys(todosLosArchivos).forEach(function(fid) {
+          try {
+            const fDrive = DriveApp.getFileById(fid);
+            if (typeof cargarDocumentoExpediente === 'function') {
+              cargarDocumentoExpediente({
+                rut: personaData.RUT,
+                tipoDocumento: todosLosArchivos[fid],
+                archivo: fDrive.getBlob(),
+                nombrePersona: ((personaData.NOMBRES || '') + ' ' + (personaData.APELLIDO_PATERNO || '') + ' ' + (personaData.APELLIDO_MATERNO || '')).trim(),
+                nombreEmprendimiento: empData.NOMBRE_COMERCIAL || '',
+                usuarioEmail: 'FORMULARIO_MERCADO'
+              });
+            }
+          } catch (errDoc) {
+            Logger.log('Aviso al procesar documento para expediente: ' + errDoc.message);
+          }
+        });
+      } catch (errDocs) {
+        Logger.log('Error general al almacenar documentos en expediente: ' + errDocs.message);
       }
 
       repoInsertar('REGISTROS_FORMULARIO', {
@@ -1437,7 +1355,7 @@ function apiLimpiarActivadoresMercados() {
 
 /**
  * API RPC: Lee todas las respuestas históricas o pendientes enviadas al Formulario Oficial
- * y las procesa asegurando su persistencia en Turso, Google Sheets y Google Drive.
+ * y las procesa asegurando su persistencia en Google Sheets y Google Drive.
  */
 function apiProcesarRespuestasPendientesFormulario() {
   try {

@@ -85,40 +85,6 @@ function apiValidarRut(rut) {
   return validarRutChileno(rut);
 }
 
-/**
- * API RPC: Configura las credenciales de Turso en las propiedades del script.
- */
-function apiTursoConfigurar(url, token) {
-  try {
-    usuarioActual_();
-    return tursoConfigurarCredenciales(url, token);
-  } catch (error) {
-    return { success: false, data: null, error: error.message };
-  }
-}
-
-/**
- * API RPC: Prueba la conexión directa a Turso con SELECT 1.
- */
-function apiTursoProbar() {
-  try {
-    return tursoTestConexion();
-  } catch (error) {
-    return { success: false, data: null, error: error.message };
-  }
-}
-
-/**
- * API RPC: Inicializa el esquema DDL relacional en Turso.
- */
-function apiTursoInicializar() {
-  try {
-    usuarioActual_();
-    return tursoInicializarEsquema();
-  } catch (error) {
-    return { success: false, data: null, error: error.message };
-  }
-}
 
 /**
  * API RPC: Guarda o actualiza un emprendedor y su negocio con validaciones chilenas.
@@ -156,7 +122,7 @@ function apiFichasListar(filtros) {
 }
 
 /**
- * API RPC: Sube un archivo a Google Drive y registra en Turso.
+ * API RPC: Sube un archivo a Google Drive y registra en Google Sheets.
  */
 function apiExpedienteCargar(params) {
   try {
@@ -381,7 +347,7 @@ function apiObtenerResumenVentasPorDia(idIniciativa) {
 
 /**
  * API RPC: Sincroniza las convocatorias abiertas en el Formulario Único Oficial de Postulaciones (en Mi Unidad)
- * y procesa automáticamente cualquier postulación pendiente para sincronizarla en Turso y Drive.
+ * y procesa automáticamente cualquier postulación pendiente para sincronizarla en Google Sheets y Drive.
  */
 function apiSincronizarFormularioOficial() {
   try {

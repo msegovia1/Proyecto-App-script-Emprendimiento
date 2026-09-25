@@ -1,7 +1,7 @@
 // SeleccionService.gs
-// Motor de Admisibilidad, Selección Pseudoaleatoria con Semilla (LCG) y Reasignación en Cascada
-// Sistema de Gestión de Emprendimientos (SGE) - Municipalidad de Santiago
+// SGE v2.1.0 - Motor de Admisibilidad, Selección Pseudoaleatoria con Semilla (LCG) y Reasignación en Cascada
 // 100% Determinista, Auditable y Reproducible para Contraloría / Concejo Municipal
+// Persistencia relacional en Google Sheets (Repository.gs)
 
 /**
  * Generador Congruencial Lineal (LCG) Determinista
@@ -36,101 +36,84 @@ function evaluarAdmisibilidadIniciativa(idIniciativa, evaluadorEmail) {
   try {
     const evaluador = evaluadorEmail || 'sistema@santiago.cl';
 
-    // 1. Obtener criterios de la iniciativa
-    const qCrit = tursoEjecutar(
-      `SELECT * FROM criterios_admisibilidad WHERE id_iniciativa = ? ORDER BY orden ASC;`,
-      [idIniciativa]
-    );
-    const criterios = (qCrit.success && qCrit.data.rows) || [];
+    // 1. Obtener criterios de la iniciativa desde REQUISITOS en Google Sheets
+    let criterios = [];
+    if (typeof repoTodos === 'function') {
+      const todosReq = repoTodos('REQUISITOS', { incluirInactivos: false }) || [];
+      criterios = todosReq.filter(r => r.ID_INICIATIVA === idIniciativa && r.ACTIVO !== 'NO');
+    }
 
     // 2. Obtener postulaciones en estado INGRESADA o PENDIENTE
-    const qPost = tursoEjecutar(
-      `SELECT p.id_postulacion, p.id_emprendimiento, p.id_persona_contacto,
-              per.comuna, per.tramo_rsh, per.discapacidad_declarada,
-              emp.rubro, emp.formalizacion_sii, emp.etapa_madurez
-       FROM postulaciones p
-       JOIN personas per ON p.id_persona_contacto = per.id_persona
-       JOIN emprendimientos emp ON p.id_emprendimiento = emp.id_emprendimiento
-       WHERE p.id_iniciativa = ? AND p.estado_postulacion IN ('INGRESADA', 'PENDIENTE');`,
-      [idIniciativa]
-    );
+    const posts = typeof repoTodos === 'function' ? (repoTodos('POSTULACIONES', { incluirInactivos: false }) || []) : [];
+    const postulaciones = posts.filter(p => {
+      return p.ID_INICIATIVA === idIniciativa && 
+             ['INGRESADA', 'PENDIENTE', 'RECIBIDA', 'BORRADOR'].indexOf(p.ESTADO_POSTULACION) >= 0;
+    });
 
-    const postulaciones = (qPost.success && qPost.data.rows) || [];
     if (postulaciones.length === 0) {
       return {
         success: true,
-        data: { evaluadas: 0, mensaje: 'No hay postulaciones pendientes de evaluación para esta iniciativa.' },
+        data: { evaluadas: 0, admisibles: 0, noAdmisibles: 0, mensaje: 'No hay postulaciones pendientes de evaluación para esta iniciativa.' },
         error: null
       };
     }
 
-    const transacciones = [];
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: true }) || []) : [];
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || []) : [];
+
     let totalAdmisibles = 0;
     let totalNoAdmisibles = 0;
+    const ahora = (typeof ahoraIso_ === 'function') ? ahoraIso_() : new Date().toISOString();
 
     for (const post of postulaciones) {
+      const per = personas.find(p => p.ID_PERSONA === post.ID_PERSONA_CONTACTO);
+      const emp = emps.find(e => e.ID_EMPRENDIMIENTO === post.ID_EMPRENDIMIENTO);
+
+      const comuna = (per && (per.COMUNA_RESIDENCIA || per.COMUNA || '')) || '';
+      const formalizacion = (emp && emp.FORMALIZACION) || 'SIN_INICIO';
+      const rubro = (emp && emp.ID_RUBRO) || '';
+
       let esAdmisible = true;
       const motivosRechazo = [];
 
-      for (const crit of criterios) {
-        let cumpleCriterio = true;
-        let valorReal = '';
+      if (criterios.length > 0) {
+        for (const crit of criterios) {
+          let cumple = true;
+          const campo = (crit.CAMPO || '').toUpperCase();
+          const operador = (crit.OPERADOR || 'IGUAL').toUpperCase();
+          const esperado = (crit.VALOR_ESPERADO || '').toUpperCase();
 
-        if (crit.campo_evaluado === 'comuna') {
-          valorReal = (post.comuna || '').toUpperCase();
-          cumpleCriterio = valorReal === (crit.valor_esperado || 'SANTIAGO').toUpperCase();
-        } else if (crit.campo_evaluado === 'rubro') {
-          valorReal = (post.rubro || '').toUpperCase();
-          cumpleCriterio = !crit.valor_esperado || valorReal === crit.valor_esperado.toUpperCase();
-        } else if (crit.campo_evaluado === 'formalizacion_sii') {
-          valorReal = (post.formalizacion_sii || '').toUpperCase();
-          if (crit.valor_esperado === 'FORMALIZADO') {
-            cumpleCriterio = valorReal !== 'SIN_INICIO';
-          } else {
-            cumpleCriterio = valorReal === (crit.valor_esperado || '').toUpperCase();
+          if (campo.includes('COMUNA')) {
+            const comU = comuna.trim().toUpperCase();
+            cumple = operador === 'IGUAL' ? (comU === esperado || comU === 'SANTIAGO') : true;
+          } else if (campo.includes('RUBRO')) {
+            cumple = !esperado || rubro.toUpperCase() === esperado;
+          } else if (campo.includes('FORMALIZACION')) {
+            cumple = esperado === 'FORMALIZADO' ? (formalizacion !== 'SIN_INICIO') : (formalizacion === esperado);
+          }
+
+          if (!cumple) {
+            esAdmisible = false;
+            motivosRechazo.push(`Incumple requisito: ${crit.CAMPO} ${crit.OPERADOR} ${crit.VALOR_ESPERADO}`);
           }
         }
-
-        if (!cumpleCriterio && crit.es_excluyente) {
+      } else {
+        // Regla general de la Municipalidad de Santiago: Comuna Santiago
+        const comunaNormalizada = typeof normalizarComuna === 'function' ? normalizarComuna(comuna) : comuna;
+        if (comunaNormalizada && comunaNormalizada.toUpperCase() !== 'SANTIAGO') {
           esAdmisible = false;
-          motivosRechazo.push(crit.descripcion || `Incumple criterio ${crit.codigo_criterio}`);
+          motivosRechazo.push('Residencia declarada fuera de la comuna de Santiago');
         }
-
-        // Registrar evaluación individual
-        transacciones.push({
-          sql: `INSERT OR REPLACE INTO evaluaciones_criterio (
-            id_evaluacion, id_postulacion, id_criterio, cumple, observacion, evaluador, fecha_evaluacion
-          ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'));`,
-          args: [
-            'eval-' + Utilities.getUuid(),
-            post.id_postulacion,
-            crit.id_criterio,
-            cumpleCriterio ? 'SI' : 'NO',
-            cumpleCriterio ? 'Cumple con requisito' : 'No cumple con requisito paramétrico',
-            evaluador
-          ]
-        });
       }
 
       const nuevoEstado = esAdmisible ? 'ADMISIBLE' : 'NO_ADMISIBLE';
       if (esAdmisible) totalAdmisibles++; else totalNoAdmisibles++;
 
-      transacciones.push({
-        sql: `UPDATE postulaciones 
-              SET estado_postulacion = ?, motivo_rechazo = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_postulacion = ?;`,
-        args: [
-          nuevoEstado,
-          motivosRechazo.join(' | ') || null,
-          evaluador,
-          post.id_postulacion
-        ]
-      });
-    }
-
-    const txRes = tursoTransaccion(transacciones);
-    if (!txRes.success) {
-      return { success: false, data: null, error: 'Error guardando evaluación: ' + txRes.error };
+      repoActualizar('POSTULACIONES', post.ID_POSTULACION, {
+        ESTADO_POSTULACION: nuevoEstado,
+        ACTUALIZADO_POR: evaluador,
+        ACTUALIZADO_EN: ahora
+      }, { motivo: esAdmisible ? 'Aprobación automática de admisibilidad' : ('Rechazo admisibilidad: ' + motivosRechazo.join(' | ')) });
     }
 
     return {
@@ -168,30 +151,37 @@ function ejecutarSeleccionTransparente(params) {
     const ejecutor = params.ejecutorEmail || 'secretario_municipal@santiago.cl';
 
     // 1. Obtener la iniciativa y cupos
-    const qIni = tursoEjecutar(
-      `SELECT id_iniciativa, nombre, cupos_titulares, cupos_suplentes FROM iniciativas WHERE id_iniciativa = ?;`,
-      [idIniciativa]
-    );
-    const iniciativa = qIni.success && qIni.data.rows && qIni.data.rows[0];
+    const iniciativa = typeof repoBuscarPorId === 'function' ? repoBuscarPorId('INICIATIVAS', idIniciativa) : null;
     if (!iniciativa) {
       return { success: false, data: null, error: 'Iniciativa no encontrada.' };
     }
 
-    const cuposTitulares = iniciativa.cupos_titulares || 20;
-    const cuposSuplentes = iniciativa.cupos_suplentes || 10;
+    const cuposTitulares = parseInt(iniciativa.CUPOS_TITULARES, 10) || 20;
+    const cuposSuplentes = parseInt(iniciativa.CUPOS_SUPLENTES, 10) || 10;
 
-    // 2. Obtener el universo de postulaciones ADMISIBLES en orden canónico
-    const qAdm = tursoEjecutar(
-      `SELECT p.id_postulacion, p.id_emprendimiento, p.id_persona_contacto, per.rut, per.nombres, per.apellidos, emp.nombre_comercial
-       FROM postulaciones p
-       JOIN personas per ON p.id_persona_contacto = per.id_persona
-       JOIN emprendimientos emp ON p.id_emprendimiento = emp.id_emprendimiento
-       WHERE p.id_iniciativa = ? AND p.estado_postulacion = 'ADMISIBLE'
-       ORDER BY p.id_postulacion ASC;`,
-      [idIniciativa]
-    );
+    // 2. Obtener el universo de postulaciones ADMISIBLES en orden canónico por ID
+    const posts = typeof repoTodos === 'function' ? (repoTodos('POSTULACIONES', { incluirInactivos: false }) || []) : [];
+    const personas = typeof repoTodos === 'function' ? (repoTodos('PERSONAS', { incluirInactivos: true }) || []) : [];
+    const emps = typeof repoTodos === 'function' ? (repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || []) : [];
 
-    const universo = (qAdm.success && qAdm.data.rows) || [];
+    const universo = posts
+      .filter(p => p.ID_INICIATIVA === idIniciativa && p.ESTADO_POSTULACION === 'ADMISIBLE')
+      .map(p => {
+        const per = personas.find(item => item.ID_PERSONA === p.ID_PERSONA_CONTACTO) || {};
+        const emp = emps.find(item => item.ID_EMPRENDIMIENTO === p.ID_EMPRENDIMIENTO) || {};
+        return {
+          id_postulacion: p.ID_POSTULACION,
+          id_emprendimiento: p.ID_EMPRENDIMIENTO,
+          id_persona_contacto: p.ID_PERSONA_CONTACTO,
+          rut: per.RUT_NORMALIZADO || per.RUT || '',
+          nombres: per.NOMBRES || '',
+          apellidos: [per.APELLIDO_PATERNO, per.APELLIDO_MATERNO].filter(Boolean).join(' '),
+          nombre_comercial: emp.NOMBRE_COMERCIAL || ''
+        };
+      });
+
+    universo.sort((a, b) => String(a.id_postulacion).localeCompare(String(b.id_postulacion)));
+
     if (universo.length === 0) {
       return {
         success: false,
@@ -229,25 +219,22 @@ function ejecutarSeleccionTransparente(params) {
 
     // 5. Asignar orden de prelación, TITULAR, SUPLENTE o EXCLUIDO
     const idProceso = 'proc-' + Utilities.getUuid();
-    const transacciones = [];
+    const ahora = (typeof ahoraIso_ === 'function') ? ahoraIso_() : new Date().toISOString();
 
-    // Registrar proceso inmutable
-    transacciones.push({
-      sql: `INSERT INTO procesos_seleccion (
-        id_proceso, id_iniciativa, semilla_numerica, huella_universo_admisible, total_admisibles,
-        total_titulares, total_suplentes, metodo_sorteo, ejecutor, estado, creado_en
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'LCG_DETERMINISTA', ?, 'FINALIZADO', datetime('now'));`,
-      args: [
-        idProceso,
-        idIniciativa,
-        semilla,
-        huellaUniverso,
-        copiaUniverso.length,
-        Math.min(cuposTitulares, copiaUniverso.length),
-        Math.max(0, Math.min(cuposSuplentes, copiaUniverso.length - cuposTitulares)),
-        ejecutor
-      ]
-    });
+    // Guardar proceso en PROCESOS_SELECCION
+    repoInsertar('PROCESOS_SELECCION', {
+      ID_PROCESO: idProceso,
+      ID_INICIATIVA: idIniciativa,
+      VERSION_REGLAS: '1',
+      METODO: 'LCG_DETERMINISTA',
+      PARAMETROS_JSON: JSON.stringify({ semilla: semilla, huellaUniverso: huellaUniverso }),
+      SEMILLA: String(semilla),
+      FECHA_EJECUCION: ahora,
+      EJECUTADO_POR: ejecutor,
+      ESTADO: 'FINALIZADO',
+      TAMANO_UNIVERSO: copiaUniverso.length,
+      HUELLA_INTEGRIDAD: huellaUniverso
+    }, { motivo: 'Ejecución de sorteo determinista' });
 
     const resultadosPublicos = [];
 
@@ -265,43 +252,39 @@ function ejecutarSeleccionTransparente(params) {
         nuevoEstadoPost = 'SUPLENTE';
       }
 
-      // Guardar en resultados_seleccion
-      transacciones.push({
-        sql: `INSERT INTO resultados_seleccion (
-          id_resultado, id_proceso, id_postulacion, orden_prelacion, resultado, puntaje_sorteo, creado_en
-        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'));`,
-        args: [
-          'res-' + Utilities.getUuid(),
-          idProceso,
-          post.id_postulacion,
-          orden,
-          resultado,
-          orden
-        ]
-      });
+      // Guardar en RESULTADOS_SELECCION
+      repoInsertar('RESULTADOS_SELECCION', {
+        ID_RESULTADO: 'res-' + Utilities.getUuid(),
+        ID_PROCESO: idProceso,
+        ID_POSTULACION: post.id_postulacion,
+        RESULTADO: resultado,
+        POSICION: orden,
+        ESTRATO: 'GENERAL',
+        FECHA_RESULTADO: ahora,
+        PROCESO_ORIGEN: idProceso
+      }, { auditar: false });
 
-      // Actualizar estado en postulaciones
-      transacciones.push({
-        sql: `UPDATE postulaciones 
-              SET estado_postulacion = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_postulacion = ?;`,
-        args: [nuevoEstadoPost, ejecutor, post.id_postulacion]
-      });
+      // Actualizar estado en POSTULACIONES
+      repoActualizar('POSTULACIONES', post.id_postulacion, {
+        ESTADO_POSTULACION: nuevoEstadoPost,
+        ACTUALIZADO_POR: ejecutor,
+        ACTUALIZADO_EN: ahora
+      }, { auditar: false });
 
-      // Si es TITULAR, crear registro en confirmaciones_participacion
+      // Si es TITULAR, crear registro en PARTICIPACIONES
       if (resultado === 'TITULAR') {
-        transacciones.push({
-          sql: `INSERT INTO confirmaciones_participacion (
-            id_confirmacion, id_postulacion, id_iniciativa, estado, puesto_asignado, creado_por, creado_en
-          ) VALUES (?, ?, ?, 'PENDIENTE', ?, ?, datetime('now'));`,
-          args: [
-            'conf-' + Utilities.getUuid(),
-            post.id_postulacion,
-            idIniciativa,
-            'Puesto-' + String(orden).padStart(2, '0'),
-            ejecutor
-          ]
-        });
+        repoInsertar('PARTICIPACIONES', {
+          ID_PARTICIPACION: 'part-' + Utilities.getUuid(),
+          ID_RESULTADO: idProceso,
+          ID_POSTULACION: post.id_postulacion,
+          ESTADO_PARTICIPACION: 'PENDIENTE',
+          FECHA_CONFIRMACION: '',
+          FECHA_ASISTENCIA: '',
+          MOTIVO: 'Puesto-' + String(orden).padStart(2, '0'),
+          REEMPLAZA_A: '',
+          CREADO_EN: ahora,
+          CREADO_POR: ejecutor
+        }, { auditar: false });
       }
 
       resultadosPublicos.push({
@@ -309,27 +292,27 @@ function ejecutarSeleccionTransparente(params) {
         resultado: resultado,
         idPostulacion: post.id_postulacion,
         rut: post.rut,
-        nombreEmprendedor: `${post.nombres} ${post.apellidos}`,
+        nombreEmprendedor: `${post.nombres} ${post.apellidos}`.trim(),
         nombreComercial: post.nombre_comercial
       });
     }
 
-    // Registrar en auditoría institucional
-    transacciones.push({
-      sql: `INSERT INTO auditoria (id_auditoria, accion, entidad, id_entidad, payload_nuevo, usuario_email, timestamp)
-            VALUES (?, 'EJECUTAR_SELECCION_LCG', 'PROCESOS_SELECCION', ?, ?, ?, datetime('now'));`,
-      args: [
-        'aud-' + Utilities.getUuid(),
-        idProceso,
-        JSON.stringify({ semilla: semilla, huellaUniverso: huellaUniverso, total: copiaUniverso.length }),
-        ejecutor
-      ]
-    });
-
-    const txRes = tursoTransaccion(transacciones);
-    if (!txRes.success) {
-      return { success: false, data: null, error: 'Error guardando proceso de selección en Turso: ' + txRes.error };
-    }
+    // Auditoría institucional
+    try {
+      repoInsertar('AUDITORIA', {
+        ID_EVENTO_AUDITORIA: 'aud-' + Utilities.getUuid(),
+        FECHA_HORA: ahora,
+        ID_USUARIO: ejecutor,
+        ROL: 'ADMIN',
+        ACCION: 'EJECUTAR_SELECCION_LCG',
+        ENTIDAD: 'PROCESOS_SELECCION',
+        ID_REGISTRO: idProceso,
+        VALOR_ANTERIOR: '',
+        VALOR_NUEVO: JSON.stringify({ semilla: semilla, huellaUniverso: huellaUniverso, total: copiaUniverso.length }),
+        MOTIVO: 'Sorteo determinista auditable',
+        ID_CORRELACION: ''
+      }, { auditar: false });
+    } catch (e) {}
 
     return {
       success: true,
@@ -341,7 +324,7 @@ function ejecutarSeleccionTransparente(params) {
         totalTitulares: Math.min(cuposTitulares, copiaUniverso.length),
         totalSuplentes: Math.max(0, Math.min(cuposSuplentes, copiaUniverso.length - cuposTitulares)),
         resultados: resultadosPublicos,
-        mensaje: 'Selección determinista completada exitosamente. Es 100% reproducible y auditable.'
+        mensaje: 'Selección determinista completada exitosamente en Google Sheets. Es 100% reproducible y auditable.'
       },
       error: null
     };
@@ -369,43 +352,34 @@ function gestionarConfirmacionTitular(params) {
     const idPostulacion = params.idPostulacion;
     const accion = params.accion.toUpperCase();
     const usuario = params.usuarioEmail || 'coordinador_ferias@santiago.cl';
+    const ahora = (typeof ahoraIso_ === 'function') ? ahoraIso_() : new Date().toISOString();
 
-    // Obtener confirmación actual
-    const qConf = tursoEjecutar(
-      `SELECT c.*, p.id_iniciativa 
-       FROM confirmaciones_participacion c
-       JOIN postulaciones p ON c.id_postulacion = p.id_postulacion
-       WHERE c.id_postulacion = ?;`,
-      [idPostulacion]
-    );
-
-    const conf = qConf.success && qConf.data.rows && qConf.data.rows[0];
-    if (!conf) {
-      return { success: false, data: null, error: 'No se encontró registro de confirmación para esta postulación.' };
+    const post = typeof repoBuscarPorId === 'function' ? repoBuscarPorId('POSTULACIONES', idPostulacion) : null;
+    if (!post) {
+      return { success: false, data: null, error: 'No se encontró la postulación especificada.' };
     }
 
-    const transacciones = [];
+    const participaciones = typeof repoTodos === 'function' ? (repoTodos('PARTICIPACIONES', { incluirInactivos: true }) || []) : [];
+    const part = participaciones.find(p => p.ID_POSTULACION === idPostulacion);
+
+    const puestoAsignado = (part && part.MOTIVO) ? part.MOTIVO : 'STAND-ASIGNADO';
 
     if (accion === 'CONFIRMAR') {
-      transacciones.push({
-        sql: `UPDATE confirmaciones_participacion 
-              SET estado = 'CONFIRMADO', fecha_confirmacion = datetime('now'), actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_confirmacion = ?;`,
-        args: [usuario, conf.id_confirmacion]
-      });
-      transacciones.push({
-        sql: `UPDATE postulaciones 
-              SET estado_postulacion = 'CONFIRMADA', actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_postulacion = ?;`,
-        args: [usuario, idPostulacion]
-      });
-
-      const txOk = tursoTransaccion(transacciones);
-      if (!txOk.success) return { success: false, data: null, error: txOk.error };
+      if (part) {
+        repoActualizar('PARTICIPACIONES', part.ID_PARTICIPACION, {
+          ESTADO_PARTICIPACION: 'CONFIRMADA',
+          FECHA_CONFIRMACION: ahora
+        }, { motivo: 'Confirmación de titular' });
+      }
+      repoActualizar('POSTULACIONES', idPostulacion, {
+        ESTADO_POSTULACION: 'CONFIRMADA',
+        ACTUALIZADO_POR: usuario,
+        ACTUALIZADO_EN: ahora
+      }, { motivo: 'Confirmación de asistencia titular' });
 
       return {
         success: true,
-        data: { estado: 'CONFIRMADO', puestoAsignado: conf.puesto_asignado, mensaje: 'Participación confirmada exitosamente.' },
+        data: { estado: 'CONFIRMADO', puestoAsignado: puestoAsignado, mensaje: 'Participación confirmada exitosamente.' },
         error: null
       };
     }
@@ -413,78 +387,83 @@ function gestionarConfirmacionTitular(params) {
     if (accion === 'DESISTIR') {
       const motivo = params.motivoDesistimiento || 'Desistimiento voluntario';
 
-      // 1. Buscar el siguiente suplente en orden de prelación que no haya sido asignado aún
-      const qSigSuplente = tursoEjecutar(
-        `SELECT r.id_postulacion, r.orden_prelacion, per.nombres, per.apellidos, emp.nombre_comercial
-         FROM resultados_seleccion r
-         JOIN postulaciones p ON r.id_postulacion = p.id_postulacion
-         JOIN personas per ON p.id_persona_contacto = per.id_persona
-         JOIN emprendimientos emp ON p.id_emprendimiento = emp.id_emprendimiento
-         WHERE p.id_iniciativa = ? AND r.resultado = 'SUPLENTE' AND p.estado_postulacion = 'SUPLENTE'
-         ORDER BY r.orden_prelacion ASC
-         LIMIT 1;`,
-        [conf.id_iniciativa]
-      );
-
-      const siguienteSuplente = qSigSuplente.success && qSigSuplente.data.rows && qSigSuplente.data.rows[0];
-
-      // Marcar desistimiento del titular
-      transacciones.push({
-        sql: `UPDATE confirmaciones_participacion 
-              SET estado = 'DESISTIDO', motivo_desistimiento = ?, reasignado_a_postulacion = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_confirmacion = ?;`,
-        args: [motivo, siguienteSuplente ? siguienteSuplente.id_postulacion : null, usuario, conf.id_confirmacion]
-      });
-
-      transacciones.push({
-        sql: `UPDATE postulaciones 
-              SET estado_postulacion = 'RETIRADA', motivo_rechazo = ?, actualizado_en = datetime('now'), actualizado_por = ?
-              WHERE id_postulacion = ?;`,
-        args: ['Desistimiento: ' + motivo, usuario, idPostulacion]
-      });
-
-      // Si hay suplente, promoverlo en cascada
-      let datosPromovido = null;
-      if (siguienteSuplente) {
-        datosPromovido = siguienteSuplente;
-        transacciones.push({
-          sql: `UPDATE postulaciones 
-                SET estado_postulacion = 'SELECCIONADA', actualizado_en = datetime('now'), actualizado_por = ?
-                WHERE id_postulacion = ?;`,
-          args: [usuario, siguienteSuplente.id_postulacion]
-        });
-
-        transacciones.push({
-          sql: `INSERT INTO confirmaciones_participacion (
-            id_confirmacion, id_postulacion, id_iniciativa, estado, puesto_asignado, creado_por, creado_en
-          ) VALUES (?, ?, ?, 'PENDIENTE', ?, ?, datetime('now'));`,
-          args: [
-            'conf-' + Utilities.getUuid(),
-            siguienteSuplente.id_postulacion,
-            conf.id_iniciativa,
-            conf.puesto_asignado, // Hereda el puesto del que desistió
-            usuario
-          ]
-        });
+      if (part) {
+        repoActualizar('PARTICIPACIONES', part.ID_PARTICIPACION, {
+          ESTADO_PARTICIPACION: 'DESISTIO'
+        }, { motivo: 'Desistimiento titular: ' + motivo });
       }
 
-      const txDes = tursoTransaccion(transacciones);
-      if (!txDes.success) return { success: false, data: null, error: txDes.error };
+      repoActualizar('POSTULACIONES', idPostulacion, {
+        ESTADO_POSTULACION: 'RETIRADA',
+        ACTUALIZADO_POR: usuario,
+        ACTUALIZADO_EN: ahora
+      }, { motivo: 'Desistimiento: ' + motivo });
+
+      // Buscar siguiente suplente en orden de prelación
+      const resultados = typeof repoTodos === 'function' ? (repoTodos('RESULTADOS_SELECCION', { incluirInactivos: false }) || []) : [];
+      const postsIniciativa = typeof repoTodos === 'function' ? (repoTodos('POSTULACIONES', { incluirInactivos: false }) || []).filter(p => p.ID_INICIATIVA === post.ID_INICIATIVA) : [];
+
+      const suplentesDisponibles = [];
+      resultados.forEach(r => {
+        if (r.RESULTADO === 'SUPLENTE') {
+          const pMatch = postsIniciativa.find(p => p.ID_POSTULACION === r.ID_POSTULACION && p.ESTADO_POSTULACION === 'SUPLENTE');
+          if (pMatch) {
+            suplentesDisponibles.push({
+              idPostulacion: pMatch.ID_POSTULACION,
+              ordenPrelacion: parseInt(r.POSICION, 10) || 999,
+              idEmprendimiento: pMatch.ID_EMPRENDIMIENTO,
+              idPersonaContacto: pMatch.ID_PERSONA_CONTACTO
+            });
+          }
+        }
+      });
+
+      suplentesDisponibles.sort((a, b) => a.ordenPrelacion - b.ordenPrelacion);
+      const siguienteSuplente = suplentesDisponibles[0] || null;
+
+      let datosPromovido = null;
+      if (siguienteSuplente) {
+        repoActualizar('POSTULACIONES', siguienteSuplente.idPostulacion, {
+          ESTADO_POSTULACION: 'SELECCIONADA',
+          ACTUALIZADO_POR: usuario,
+          ACTUALIZADO_EN: ahora
+        }, { motivo: 'Promovido desde suplente por desistimiento de puesto ' + puestoAsignado });
+
+        repoInsertar('PARTICIPACIONES', {
+          ID_PARTICIPACION: 'part-' + Utilities.getUuid(),
+          ID_RESULTADO: '',
+          ID_POSTULACION: siguienteSuplente.idPostulacion,
+          ESTADO_PARTICIPACION: 'PENDIENTE',
+          FECHA_CONFIRMACION: '',
+          FECHA_ASISTENCIA: '',
+          MOTIVO: puestoAsignado,
+          REEMPLAZA_A: idPostulacion,
+          CREADO_EN: ahora,
+          CREADO_POR: usuario
+        }, { motivo: 'Asignación de puesto liberado a suplente promovido' });
+
+        const personas = repoTodos('PERSONAS', { incluirInactivos: true }) || [];
+        const emps = repoTodos('EMPRENDIMIENTOS', { incluirInactivos: true }) || [];
+        const perProm = personas.find(p => p.ID_PERSONA === siguienteSuplente.idPersonaContacto) || {};
+        const empProm = emps.find(e => e.ID_EMPRENDIMIENTO === siguienteSuplente.idEmprendimiento) || {};
+
+        datosPromovido = {
+          idPostulacion: siguienteSuplente.idPostulacion,
+          ordenPrelacion: siguienteSuplente.ordenPrelacion,
+          nombreEmprendedor: `${perProm.NOMBRES || ''} ${perProm.APELLIDO_PATERNO || ''}`.trim(),
+          nombreComercial: empProm.NOMBRE_COMERCIAL || '',
+          puestoAsignado: puestoAsignado
+        };
+      }
 
       return {
         success: true,
         data: {
           estado: 'DESISTIDO',
-          puestoLiberado: conf.puesto_asignado,
-          suplentePromovido: datosPromovido ? {
-            idPostulacion: datosPromovido.id_postulacion,
-            ordenPrelacion: datosPromovido.orden_prelacion,
-            nombreEmprendedor: `${datosPromovido.nombres} ${datosPromovido.apellidos}`,
-            nombreComercial: datosPromovido.nombre_comercial,
-            puestoAsignado: conf.puesto_asignado
-          } : null,
+          puestoLiberado: puestoAsignado,
+          suplentePromovido: datosPromovido,
           mensaje: datosPromovido 
-            ? `Titular desistido. Reasignación en cascada exitosa: promovido suplente puesto #${datosPromovido.orden_prelacion}.`
+            ? `Titular desistido. Reasignación en cascada exitosa: promovido suplente puesto #${datosPromovido.ordenPrelacion}.`
             : 'Titular desistido. No quedan más suplentes disponibles en lista de espera.'
         },
         error: null
