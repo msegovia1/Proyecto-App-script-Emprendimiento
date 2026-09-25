@@ -262,7 +262,7 @@ Se valida que el residuo corresponda exactamente a $0 \to 0$, $10 \to \text{'K'}
 Para erradicar cualquier discrecionalidad política o favoritismo en la adjudicación de puestos municipales en ferias de alta demanda, se implementó un generador congruencial lineal con semilla auditable:
 $$X_{n+1} = (a \cdot X_n + c) \pmod m$$
 - **Semilla ($X_0$):** Se genera a partir del timestamp criptográfico de la ejecución y se almacena en la tabla `PROCESOS_SELECCION`.
-- **Reproducibilidad:** Cualquier organismo auditor (Contraloría General de la República o Concejo Municipal) puede reejecutar el sorteo con la misma semilla registrada y obtener idéntico ordenamiento exacto de postulantes.
+- **Reproducibilidad:** Cualquier revisión o auditoría interna de DIDEL puede reejecutar el sorteo con la misma semilla registrada y obtener idéntico ordenamiento exacto de postulantes.
 
 ### 5.3 Algoritmo de Reemplazo en Cascada (Lista de Espera Dinámica)
 Si un emprendedor clasificado como `TITULAR_ASIGNADO` desiste o no confirma su cupo en el plazo reglamentario:

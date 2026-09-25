@@ -18,10 +18,10 @@ Para implementar el sistema en el entorno productivo institucional de la Municip
 
 ## 2. Arquitectura de Almacenamiento en Google Drive
 
-Se recomienda alojar el sistema dentro de una **Unidad Compartida (Shared Drive)** institucional (por ejemplo: `DIDECO - Fomento Productivo`), estructurada de la siguiente forma:
+Se recomienda alojar el sistema dentro de una **Unidad Compartida (Shared Drive)** institucional (por ejemplo: `DIDEL - Fomento Productivo`), estructurada de la siguiente forma:
 
 ```
-[Unidad Compartida: Fomento Productivo]
+[Unidad Compartida: DIDEL - Fomento Productivo]
 │
 ├── 📁 00_Sistema_SGE/
 │   ├── 📄 SGE_Base_Datos_Produccion (Google Spreadsheet con las 16 tablas)

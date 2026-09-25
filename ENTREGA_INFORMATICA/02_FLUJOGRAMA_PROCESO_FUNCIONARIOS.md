@@ -2,7 +2,7 @@
 ## Proceso de Gestión, Selección y Operación de Mercados de Emprendimiento (SGE v2.1.0)
 
 > **Documento:** Flujograma Operativo Funcionario  
-> **Destinatario:** Dirección de Informática / Dirección de Desarrollo Comunitario (DIDECO)  
+> **Destinatario:** Dirección de Informática / Dirección de Desarrollo Económico Local (DIDEL)  
 > **Herramienta de Diagramación:** Mermaid GFM Compliant  
 
 ---
@@ -74,7 +74,7 @@ flowchart TD
     T6 --> T7["Módulo de Seguimiento Masivo:<br/>Digitar ventas diarias declaradas ($ CLP)"]
     T7 --> T8["Evaluar Desempeño y Cumplimiento de Normas"]
     
-    T8 --> FIN(["Cierre de Iniciativa y Reporte Ejecutivo a Alcaldía"])
+    T8 --> FIN(["Cierre de Iniciativa y Balance Económico DIDEL"])
     PF_RECHAZO --> FIN_RECHAZO(["Notificación de Inadmisibilidad al Ciudadano"])
     EV_RECHAZADO --> FIN_RECHAZO
 ```
@@ -148,7 +148,7 @@ sequenceDiagram
 ### Fase 4: Sorteo Digital Transparente (LCG)
 - **Actor:** Coordinador de Fomento / Notario Municipal / Ministro de Fe.
 - **Acción:** Con un solo clic, se ejecuta el sorteo con una semilla matemática inmutable. El sistema genera la lista de titulares y la lista de espera ordenada.
-- **Ventaja SGE:** Transparencia absoluta ante reclamos de concejales o dirigentes gremiales. El proceso es 100% reproducible y auditable.
+- **Ventaja SGE:** Transparencia absoluta ante cualquier requerimiento de revisión. El proceso es 100% reproducible y auditable internamente.
 
 ### Fase 5: Confirmación de Puestos y Algoritmo de Cascada
 - **Actor:** Funcionarios Administrativos.
@@ -158,4 +158,4 @@ sequenceDiagram
 ### Fase 6: Operación en Terreno y Seguimiento Económico
 - **Actor:** Inspectores y Técnicos en Terreno.
 - **Acción:** Utilizan tablets o teléfonos móviles para pasar lista al inicio de la jornada. Al cierre del día, registran las ventas brutas declaradas de cada puesto en el módulo de seguimiento masivo.
-- **Ventaja SGE:** Permite generar reportes inmediatos para la Alcaldía con el impacto económico real, total de ventas inyectadas a la economía local y tasa de asistencia efectiva.
+- **Ventaja SGE:** Permite generar reportes inmediatos para la gestión de DIDEL con el impacto económico real, total de ventas inyectadas a la economía local y tasa de asistencia efectiva.

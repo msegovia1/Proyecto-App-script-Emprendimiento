@@ -35,7 +35,7 @@ El sistema se compone de **9 módulos funcionales integrados**:
 | 6. Asignador de Puestos y Cascada Dinámica (Promoción inmediata de lista espera)  |
 | 7. Control Operativo en Terreno (Pase de lista y registro de ventas diarias)      |
 | 8. Tablero de Control y Reportería de Impacto Económico (Dashboard Ejecutivo)     |
-| 9. Bitácora de Auditoría Inmutable (Trazabilidad total para Contraloría/Concejo)  |
+| 9. Bitácora de Auditoría Inmutable (Trazabilidad total para auditoría interna)    |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -105,7 +105,7 @@ El sistema se compone de **9 módulos funcionales integrados**:
   - Sustituye la selección a dedo por un bolillero digital matemático con semilla auditable.
 - **Emisión de Acta Inmutable:**
   - Genera y registra en base de datos la semilla utilizada, la hora exacta de ejecución y el funcionario actuante.
-  - Permite a la Contraloría, Concejo Municipal o gremios replicar el sorteo con la misma semilla para comprobar que el resultado es idéntico e inalterado.
+  - Permite a la jefatura de DIDEL y a los evaluadores replicar el sorteo con la misma semilla para comprobar que el resultado es idéntico e inalterado.
 - **Generación Dual de Listas:**
   - Divide automáticamente el universo de seleccionados en dos grupos:
     1. **Titulares Adjudicados:** Quienes obtienen el cupo directo (lugares 1 a N).
@@ -141,7 +141,7 @@ El sistema se compone de **9 módulos funcionales integrados**:
 ---
 
 ### MÓDULO 8: Tablero de Control y Métricas de Impacto Económico
-*Reportes ejecutivos automáticos para la Dirección de Desarrollo Comunitario y la Alcaldía.*
+*Reportes ejecutivos automáticos para la Dirección de Desarrollo Económico Local (DIDEL).*
 
 - **Métricas Consolidadas:**
   - Total de ventas inyectadas a la economía comunal en cada feria ($ CLP).
@@ -175,11 +175,11 @@ El sistema se compone de **9 módulos funcionales integrados**:
 
 ---
 
-## 5. Flujogramas Departamentales: Funcionamiento y Procesamiento de Datos
+## 5. Flujogramas Departamentales: Funcionamiento y Procesamiento de Datos (DIDEL)
 
-### 5.1 Flujograma de Funcionamiento Operativo del Departamento (Roles y Gestión Inter-áreas)
+### 5.1 Flujograma de Funcionamiento Operativo de DIDEL (Roles y Circuito Interno)
 
-Este diagrama ilustra cómo colaboran operativamente los distintos actores del Departamento de Fomento Productivo con la Dirección de Informática, la Alcaldía y la ciudadanía durante el ciclo completo de una feria:
+Este diagrama ilustra cómo opera exclusivamente la **Dirección de Desarrollo Económico Local (DIDEL)** en coordinación con los emprendedores y el soporte de Informática durante el ciclo completo de una feria:
 
 ```mermaid
 flowchart TD
@@ -187,40 +187,36 @@ flowchart TD
         C_POST["Emprendedor(a) Comunal<br/>- Postula a feria en línea<br/>- Adjunta RSH, SII, SEREMI y fotos<br/>- Confirma o desiste de cupo"]
     end
 
-    subgraph DEPARTAMENTO ["2. DEPARTAMENTO DE FOMENTO PRODUCTIVO (DIDECO)"]
-        D_COORD["Jefatura / Coordinador(a) de Emprendimiento<br/>- Configura feria, cupos y requisitos<br/>- Monitorea prefiltro automático<br/>- Ejecuta Sorteo LCG con semilla auditable<br/>- Publica decretos y actas oficiales"]
-        D_EVAL["Equipo Evaluador / Asistentes Técnicos<br/>- Valida vigencia de cartolas en Drive<br/>- Revisa resoluciones sanitarias<br/>- Dictamina ADMISIBLE / INADMISIBLE con fundamento"]
-        D_TERR["Inspectores y Monitores en Terreno<br/>- Habilitan y recepcionan stands<br/>- Pasan lista móvil al inicio del día<br/>- Digitan ventas diarias reportadas<br/>- Califican conducta y cumplimiento"]
+    subgraph DIDEL ["2. DIRECCIÓN DE DESARROLLO ECONÓMICO LOCAL (DIDEL)"]
+        D_DIR["Jefatura / Dirección DIDEL<br/>- Aprueba apertura de convocatorias<br/>- Monitorea Tablero de Control y métricas de impacto"]
+        D_COORD["Coordinación de Emprendimiento DIDEL<br/>- Parametriza feria, cupos y requisitos<br/>- Monitorea prefiltro automático<br/>- Ejecuta Sorteo LCG con semilla auditable<br/>- Emite y valida nóminas oficiales"]
+        D_EVAL["Equipo Evaluador DIDEL<br/>- Valida vigencia de cartolas en Drive<br/>- Revisa resoluciones sanitarias<br/>- Dictamina ADMISIBLE / INADMISIBLE con fundamento"]
+        D_TERR["Inspectores y Monitores en Terreno DIDEL<br/>- Habilitan y recepcionan stands<br/>- Pasan lista móvil al inicio del día<br/>- Digitan ventas diarias reportadas<br/>- Califican conducta y cumplimiento"]
     end
 
-    subgraph DIRECCION_INFORMATICA ["3. DIRECCIÓN DE INFORMÁTICA (TI)"]
-        TI_ADMIN["Administrador Google Workspace<br/>- Gestiona accesos y roles institucionales (@muni.cl)<br/>- Resguarda la base relacional en Google Sheets<br/>- Supervisa políticas de no egreso (Ley 19.628)<br/>- Programa respaldos automáticos de la planilla"]
+    subgraph DIRECCION_INFORMATICA ["3. DIRECCIÓN DE INFORMÁTICA (SOPORTE TI)"]
+        TI_ADMIN["Administrador Google Workspace<br/>- Gestiona accesos y roles institucionales (@muni.cl)<br/>- Resguarda la base relacional en Google Sheets<br/>- Supervisa políticas de seguridad y no egreso (Ley 19.628)<br/>- Programa respaldos automáticos de la planilla"]
     end
 
-    subgraph CONTROL_ALCALDIA ["4. DIRECCIÓN DIDECO / ALCALDÍA / CONTRALORÍA"]
-        ALC_REP["Jefatura DIDECO y Alcaldía<br/>- Visualiza Tablero de Control en tiempo real<br/>- Conoce ventas consolidadas por feria<br/>- Monitorea tasa de formalización comunal"]
-        CONT_AUD["Auditoría Interna y Concejo Municipal<br/>- Audita actas de sorteo y bitácora inmutable<br/>- Verifica ausencia de discrecionalidad política"]
-    end
-
-    %% Flujo de Operación
-    TI_ADMIN -.->|"Provee plataforma segura y permisos"| D_COORD
-    D_COORD -->|"1. Publica bases y abre convocatoria"| C_POST
-    C_POST -->|"2. Envía postulación y expediente digital"| D_EVAL
-    D_EVAL -->|"3. Entrega nómina técnica de admisibles"| D_COORD
-    D_COORD -->|"4. Ejecuta sorteo transparente (LCG)"| D_COORD
-    D_COORD -->|"5. Emite nómina de titulares y lista de espera"| C_POST
-    D_COORD -->|"6. Traspasa lista de stands asignados"| D_TERR
-    C_POST -->|"7. Se instala en el stand adjudicado"| D_TERR
-    D_TERR -->|"8. Registra asistencia y ventas diarias"| D_COORD
-    D_COORD -->|"9. Consolida informe de impacto económico"| ALC_REP
-    D_COORD -.->|"10. Pone a disposición actas y bitácora"| CONT_AUD
+    %% Flujo Operativo Exclusivo DIDEL
+    TI_ADMIN -.->|"Provee plataforma segura y permisos"| DIDEL
+    D_DIR -->|"1. Instruye apertura de convocatoria"| D_COORD
+    D_COORD -->|"2. Publica bases y abre convocatoria"| C_POST
+    C_POST -->|"3. Envía postulación y expediente digital"| D_EVAL
+    D_EVAL -->|"4. Entrega nómina técnica de admisibles"| D_COORD
+    D_COORD -->|"5. Ejecuta sorteo transparente (LCG)"| D_COORD
+    D_COORD -->|"6. Emite nómina de titulares y lista de espera"| C_POST
+    D_COORD -->|"7. Traspasa lista de stands asignados"| D_TERR
+    C_POST -->|"8. Se instala en el stand adjudicado"| D_TERR
+    D_TERR -->|"9. Registra asistencia y ventas diarias"| D_COORD
+    D_COORD -->|"10. Consolida balance y reporte económico final"| D_DIR
 ```
 
 ---
 
-### 5.2 Flujograma del Procesamiento y Ciclo de Datos del Departamento
+### 5.2 Flujograma del Procesamiento y Ciclo de Datos en DIDEL
 
-Este diagrama muestra la **trazabilidad técnica de los datos**: desde que el ciudadano los digita, pasando por los filtros de depuración y resguardo criptográfico, hasta convertirse en reportes estratégicos para la autoridad comunal:
+Este diagrama muestra la **trazabilidad técnica de los datos** gestionados internamente por DIDEL:
 
 ```mermaid
 flowchart LR
@@ -255,11 +251,11 @@ flowchart LR
         FIELD_DATA["Captura Móvil en Feria<br/>- Asistencia efectiva (SI/NO)<br/>- Ventas diarias ($ CLP)<br/>- Observaciones de inspección"]
     end
 
-    subgraph SALIDAS_REPORTABILIDAD ["6. SALIDAS E INTELIGENCIA MUNICIPAL"]
+    subgraph SALIDAS_REPORTABILIDAD ["6. SALIDAS E INTELIGENCIA DIDEL"]
         direction TB
-        OUT_ACTA["Acta Oficial de Selección<br/>(Descargable en Excel/PDF)"]
-        OUT_DASH["Tablero Ejecutivo Alcaldía<br/>- Monto total transaccionado<br/>- Venta promedio por rubro"]
-        OUT_AUDIT["Bitácora Inmutable (AUDITORIA)<br/>- Pista para Contraloría / Ley de Transparencia"]
+        OUT_ACTA["Acta Oficial de Selección DIDEL<br/>(Descargable en Excel/PDF)"]
+        OUT_DASH["Tablero de Control DIDEL<br/>- Monto total transaccionado<br/>- Venta promedio por rubro"]
+        OUT_AUDIT["Bitácora Inmutable (AUDITORIA)<br/>- Registro de trazabilidad y seguridad"]
     end
 
     %% Conexiones
