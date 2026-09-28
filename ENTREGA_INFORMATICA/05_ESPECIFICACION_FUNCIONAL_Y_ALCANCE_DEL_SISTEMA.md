@@ -1,278 +1,233 @@
 # ESPECIFICACIÓN FUNCIONAL Y ALCANCE DEL SISTEMA
 ## Sistema de Gestión y Asignación de Mercados de Emprendimiento (SGE v2.1.0)
 
-> **Documento:** Alcance Funcional y Contenido Requerido del Sistema  
-> **Destinatario:** Dirección de Informática / Jefatura de Fomento Productivo  
-> **Objetivo:** Definir qué funciones realiza el sistema, qué componentes debe contener obligatoriamente y qué problemas resuelve en la gestión municipal, sin centrarse en el instructivo de instalación.
+> **Documento:** Especificación Funcional y Modelo de Datos  
+> **Destinatario:** Dirección de Informática  
+> **Alcance:** Exclusivamente las funcionalidades, interfaces, campos de datos y algoritmos implementados en el código fuente del sistema.  
 
 ---
 
-## 1. Propósito Fundamental: ¿Qué Problema Resuelve?
+## 1. Propósito y Alcance del Software
 
-Históricamente, los municipios gestionan sus ferias y mercados de emprendimiento mediante planillas de cálculo sueltas (Excel), carpetas físicas y mensajería informal (WhatsApp). Esto genera:
-1. **Asignación discrecional o cuestionable de puestos:** Reclamos ciudadanos y suspicacias de favoritismo ante la falta de un mecanismo transparente y comprobable.
-2. **Duplicidad de documentos y pérdida de expedientes:** Ciudadanos obligados a entregar la misma cartola RSH o resolución sanitaria en cada feria a la que postulan.
-3. **Puestos vacíos el día del evento:** Falta de un mecanismo ágil que promueva a los emprendedores de la lista de espera cuando un seleccionado titular no se presenta.
-4. **Falta de métricas de impacto económico:** Imposibilidad de responder con datos duros cuánto dinero vendió la feria, qué rubros generan mayor retorno y cuál es la tasa de formalización comunal.
-
-El **SGE** resuelve estos problemas unificando todo el ciclo de vida del emprendedor en una sola plataforma municipal nativa, transparente y auditable.
+El **SGE v2.1.0** es una aplicación web (SPA) desarrollada sobre Google Apps Script V8 y Google Workspace, diseñada para resolver la gestión de datos de convocatorias comunales de emprendimiento. Su alcance técnico abarca:
+1. **Centralización de Registros:** Sustitución de planillas dispersas por una base de datos relacional de 16 tablas en Google Sheets gobernada por `Repository.gs`.
+2. **Expediente Digital Único:** Almacenamiento estructurado en Google Drive con deduplicación criptográfica (SHA-256) para evitar duplicidad de archivos.
+3. **Validación Automática de Datos:** Filtro algorítmico de cédulas chilenas (Módulo 11), números telefónicos (E.164) y causales de admisibilidad.
+4. **Asignación Aleatoria Auditable:** Algoritmo LCG (Generador Congruencial Lineal) con semilla para distribución imparcial de cupos y corrimiento en cascada ante deserciones.
+5. **Captura y Consolidación de Métricas:** Registro de asistencia, captura de ventas diarias por participante y reportería de impacto económico.
 
 ---
 
-## 2. ¿Qué DEBE Contener el Sistema? (Módulos Obligatorios)
+## 2. Inventario de Módulos e Interfaces Implementadas
 
-El sistema se compone de **9 módulos funcionales integrados**:
+El sistema se estructura en las siguientes vistas e interfaces funcionales:
 
 ```
 +-----------------------------------------------------------------------------------+
-|                        SISTEMA DE GESTIÓN DE EMPRENDIMIENTO                       |
+|                        MÓDULOS DE LA APLICACIÓN WEB (SPA)                         |
 +-----------------------------------------------------------------------------------+
-| 1. Padrón Único y Ficha Integral (Registro Maestro de Titulares y Negocios)      |
-| 2. Expediente Digital Centralizado (Gestión y resguardo de documentos oficiales)  |
-| 3. Motor de Validación Chilena y Prefiltro Automático (RUT, RSH, SII, SEREMI)    |
-| 4. Catálogo de Convocatorias e Iniciativas (Ferias, Mercados, Expos, Cursos)     |
-| 5. Motor de Sorteo Transparente con Semilla Auditable (Algoritmo LCG)            |
-| 6. Asignador de Puestos y Cascada Dinámica (Promoción inmediata de lista espera)  |
-| 7. Control Operativo en Terreno (Pase de lista y registro de ventas diarias)      |
-| 8. Tablero de Control y Reportería de Impacto Económico (Dashboard Ejecutivo)     |
-| 9. Bitácora de Auditoría Inmutable (Trazabilidad total para auditoría interna)    |
+| 1. viewDashboard      : Métricas consolidadas, KPIs de ventas y gráficos visuales |
+| 2. viewEmprendedores  : Padrón general, ficha persona-negocio y expediente digital|
+| 3. viewIniciativas    : Catálogo de ferias/mercados, parametrización de cupos     |
+| 4. viewPostulaciones  : Listado de postulaciones y filtro de admisibilidad        |
+| 5. viewSeleccion      : Sorteo LCG con semilla, asignación y reemplazo en cascada |
+| 6. viewSeguimiento    : Grilla masiva de asistencia ('SI'/'NO') y ventas diarias  |
+| 7. viewReportes       : Exportación masiva de datos en formato CSV/Excel          |
+| 8. viewConfiguracion  : Parámetros del sistema y configuración de almacenamiento  |
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. Detalle de Funciones por Módulo (¿Qué hace cada una?)
+## 3. Detalle de Funciones por Módulo del Sistema
 
-### MÓDULO 1: Padrón Único y Ficha Integral del Emprendedor
-*Centraliza la identidad del postulante y su actividad comercial, evitando registros dispersos.*
+### MÓDULO 1: Padrón y Ficha Integral (`viewEmprendedores`)
+- **Gestión de Entidades Persona y Emprendimiento:**
+  - Formulario modal (`modalEmprendedor`) que captura en paralelo los datos de la persona natural (RUT, nombres, teléfono, domicilio, tramo RSH) y de su unidad económica (nombre de fantasía, rubro, subrubro, formalización SII, resolución sanitaria).
+  - Normalización de datos en frontend y backend: RUT chileno formateado sin puntos con guion (`12345678-5`), teléfono a estándar internacional `+569XXXXXXXX`.
+- **Expediente Digital (`modalDocumentos`):**
+  - Consulta interactiva de archivos cargados en Google Drive mediante `apiListarDocumentosEmprendedor`.
+  - Despliegue de semáforos de estado en pantalla: validación de fotos de muestra, vigencia de cartola RSH y resolución sanitaria según rubro.
+  - Carga de nuevos archivos con cálculo automático de hash SHA-256 en backend (`DriveStorageService.gs`).
 
-- **Registro y Vinculación Persona-Emprendimiento:**
-  - Modela la relación del titular con su negocio (separa los datos de la persona natural de los datos de la empresa o taller productivo).
-  - Permite que una persona posea más de un emprendimiento o que varios socios compartan una unidad productiva.
-- **Normalización de Datos de Contacto:**
-  - Estandariza teléfonos a formato internacional E.164 (`+56 9 XXXXXXXX`) para llamadas y notificaciones automatizadas.
-  - Almacena direcciones georreferenciadas (calle, número, villa/población y coordenadas) para mapeo territorial de la oferta productiva.
-- **Historial de Vulnerabilidad y Formalización:**
-  - Registra el tramo porcentual del Registro Social de Hogares (RSH: 40%, 60%, etc.).
-  - Registra el estado tributario formal ante el SII (Primera/Segunda Categoría, sin inicio).
+### MÓDULO 2: Gestión de Convocatorias e Iniciativas (`viewIniciativas`)
+- **Parametrización de Mercados:**
+  - Formulario modal (`modalIniciativa`) para crear o editar registros en la tabla `INICIATIVAS`.
+  - Campos: código identificador, nombre de la feria, tipo de evento, fechas de inicio y término, plazo fatal de postulación, dirección y total de cupos disponibles.
+- **Transición de Estados de la Iniciativa:**
+  - Control de estados: `BORRADOR` $\to$ `CONVOCATORIA_ABIERTA` $\to$ `EN_EVALUACION` $\to$ `SELECCION_FINALIZADA` $\to$ `EN_EJECUCION` $\to$ `CERRADA`.
 
----
+### MÓDULO 3: Gestión de Postulaciones y Prefiltro (`viewPostulaciones`)
+- **Listado y Filtrado:**
+  - Carga dinámica de postulantes asociados a una iniciativa seleccionada (`apiPostulacionesPorIniciativa`).
+- **Prefiltro Automático de Admisibilidad:**
+  - Cruce de datos del postulante contra los requisitos de la iniciativa: verificación de tramo RSH máximo permitido y existencia de resolución sanitaria para rubros alimentarios.
+- **Dictamen de Estado:**
+  - Actualización interactiva del campo `estado_admisibilidad`: selección entre `PENDIENTE`, `ADMISIBLE` o `INADMISIBLE`.
+  - Campo de texto obligatorio para registrar la justificación en la tabla `POSTULACIONES`.
 
-### MÓDULO 2: Expediente Digital Centralizado con Detección Antifraude
-*Gestiona la evidencia física y digital de cada ciudadano en Google Drive institucional.*
+### MÓDULO 4: Motor de Sorteo LCG y Asignación en Cascada (`viewSeleccion`)
+- **Algoritmo de Sorteo LCG (Linear Congruential Generator):**
+  - Botón "Ejecutar Sorteo Aleatorio" (`apiEjecutarSorteo`).
+  - El backend toma las postulaciones con estado `ADMISIBLE`, genera una semilla numérica auditable ($X_0$) a partir del timestamp criptográfico y aplica la relación congruencial para ordenar a los postulantes:
+    $$X_{n+1} = (a \cdot X_n + c) \pmod m$$
+  - Distribuye el resultado en dos listas:
+    1. **Titulares Asignados:** Posiciones 1 hasta $N$ (donde $N$ es el total de cupos de la iniciativa).
+    2. **Lista de Espera:** Posiciones $N+1$ en adelante, ordenadas estrictamente por orden de sorteo.
+- **Acciones de Cupo y Cascada Dinámica:**
+  - **Confirmar Cupo:** Botón que actualiza el estado a `CONFIRMADO` en la tabla `RESULTADOS_SELECCION`.
+  - **Desistir Cupo:** Botón que marca al titular en estado `DESISTIDO` y dispara el algoritmo de reemplazo en cascada (`apiDesistirCupo`):
+    1. Localiza al primer registro en `LISTA_ESPERA`.
+    2. Actualiza atómicamente su estado a `TITULAR_ASIGNADO`.
+    3. Registra el evento en la tabla `AUDITORIA` y refresca la grilla en pantalla.
 
-- **Deduplicación Criptográfica (SHA-256):**
-  - Al subir un archivo (cartola RSH, resolución sanitaria, cédula), el sistema calcula su huella digital criptográfica (hash SHA-256).
-  - Si el mismo documento ya fue cargado con anterioridad, el sistema reutiliza el enlace existente, impidiendo el consumo redundante de espacio en Drive.
-- **Estructuración Canónica de Carpetas:**
-  - Ordena automáticamente los archivos en Drive bajo la jerarquía:  
-    `01_Expedientes/[Año]/[RUT - Nombre Titular]/[Archivo]`.
-- **Visor Rápido de Expediente:**
-  - Permite al funcionario revisar en una sola ventana emergente si el emprendedor cuenta con fotos de productos, cartola RSH vigente o permiso sanitario, abriendo los archivos en Drive con un solo clic.
+### MÓDULO 5: Grilla de Seguimiento y Captura de Ventas (`viewSeguimiento`)
+- **Carga de Participantes por Iniciativa:**
+  - Selector de mercado que consulta a `apiListarParticipantesSeguimiento` para poblar la grilla con los titulares confirmados.
+- **Edición en Grilla:**
+  - Campo selector de asistencia: `SI` o `NO`.
+  - Entradas numéricas por jornada para capturar el monto de venta diaria declarado en pesos ($ CLP).
+  - Campo selector de evaluación cualitativa: `BUENA`, `REGULAR` o `DEFICIENTE`.
+  - Campo de texto libre para observaciones técnicas.
+- **Persistencia Masiva Atómica:**
+  - Botón "Guardar Seguimiento" (`apiGuardarSeguimientoMasivo`).
+  - Utiliza `LockService` para escribir de forma concurrente en las tablas `PARTICIPACIONES` (totales acumulados) y `SEGUIMIENTO_MERCADO` (desglose por día).
 
----
-
-### MÓDULO 3: Motor de Reglas Normativas y Prefiltro Automático
-*Filtra objetivamente a los postulantes antes de la evaluación humana.*
-
-- **Validación Matemática de Cédula (Módulo 11):**
-  - Bloquea cualquier ingreso de RUT falso, erróneo o mal digitado verificando el dígito verificador.
-- **Cruce Automático de Criterios Excluyentes:**
-  - **Filtro de Registro Social de Hogares:** Si las bases de la feria exigen un máximo de 60% de vulnerabilidad, el sistema detecta de forma automática a los postulantes que superan ese umbral.
-  - **Filtro Sanitario por Rubro:** Si el postulante pertenece al rubro alimentos o cosmética y no posee resolución sanitaria vigente, el sistema lo marca como inadmisible para ese evento específico.
-  - **Detección de Duplicados en la Convocatoria:** Impide que un mismo emprendedor postule dos veces a la misma feria.
-- **Cálculo de Score / Puntaje Base:**
-  - Asigna puntaje técnico según antigüedad, vulnerabilidad y estado de formalización para apoyar la priorización.
-
----
-
-### MÓDULO 4: Gestión de Convocatorias e Iniciativas
-*Administra los eventos comunales de fomento productivo.*
-
-- **Parametrización del Evento:**
-  - Configura nombre, código municipal, fechas de realización, fecha límite de postulación, lugar físico y total de stands disponibles.
-- **Distribución de Cupos por Rubro (Zonificación):**
-  - Permite reservar cuotas específicas de puestos por vocación (ej. 15 puestos para Artesanía, 10 para Alimentos elaborados, 5 para Plantas/Viveros).
-- **Ciclo de Estados del Evento:**
-  - Maneja la transición formal de estados: `Borrador` $\to$ `Convocatoria Abierta` $\to$ `En Evaluación` $\to$ `Selección Finalizada` $\to$ `En Ejecución` $\to$ `Cerrada`.
-
----
-
-### MÓDULO 5: Motor de Selección Transparente y Sorteo Auditable
-*Asigna los puestos de manera aleatoria e inobjetable mediante un algoritmo verificable.*
-
-- **Algoritmo LCG (Generador Congruencial Lineal):**
-  - Sustituye la selección a dedo por un bolillero digital matemático con semilla auditable.
-- **Emisión de Acta Inmutable:**
-  - Genera y registra en base de datos la semilla utilizada, la hora exacta de ejecución y el funcionario actuante.
-  - Permite a la jefatura de DIDEL y a los evaluadores replicar el sorteo con la misma semilla para comprobar que el resultado es idéntico e inalterado.
-- **Generación Dual de Listas:**
-  - Divide automáticamente el universo de seleccionados en dos grupos:
-    1. **Titulares Adjudicados:** Quienes obtienen el cupo directo (lugares 1 a N).
-    2. **Lista de Espera Ordenada:** Prelación estricta para reemplazos (lugares N+1 en adelante).
+### MÓDULO 6: Tablero de Control y Reportería (`viewDashboard` / `viewReportes`)
+- **Visualización de KPIs:**
+  - Tarjetas con monto total acumulado de ventas transaccionadas en ferias.
+  - Tasa de asistencia efectiva sobre stands asignados.
+  - Distribución de emprendedores según estado formal ante el SII.
+- **Exportación de Datos:**
+  - Generación en memoria y descarga en el navegador de archivos `.csv` compatibles con Excel:
+    - *Reporte de Mercado:* Detalle de participantes con ventas diarias, total acumulado y asistencia.
+    - *Padrón Comunal:* Nómina completa de personas y unidades productivas con datos de contacto normalizados.
 
 ---
 
-### MÓDULO 6: Gestión de Confirmaciones y Asignación en Cascada
-*Garantiza que el 100% de los stands se utilicen, eliminando los cupos abandonados.*
+## 4. Reglas de Negocio Implementadas en Código
 
-- **Control de Citación y Confirmación:**
-  - Monitorea el plazo legal de confirmación del emprendedor (ej. 48 horas tras la notificación).
-- **Algoritmo de Corrimiento en Cascada:**
-  - Cuando un titular seleccionado desiste de participar o no responde en el plazo:
-    1. El sistema marca al postulante como `DESISTIDO`.
-    2. Toma de forma automática al postulante número 1 de la lista de espera.
-    3. Lo promueve a `TITULAR_ASIGNADO` y emite la citación correspondiente.
-  - El proceso no altera el orden de los demás postulantes ni requiere rehacer el sorteo.
-
----
-
-### MÓDULO 7: Control Operativo en Terreno y Ventas Diarias
-*Herramienta móvil para inspectores y encargados de feria durante el evento.*
-
-- **Pase de Asistencia Digital:**
-  - Permite marcar desde un teléfono móvil o tablet si el titular se presentó a montar su stand.
-  - Registra inasistencias injustificadas para suspender al infractor de futuras convocatorias.
-- **Registro Masivo de Ventas Diarias:**
-  - Cuadrícula rápida donde el inspector digita las ventas brutas declaradas por cada puesto día por día.
-- **Evaluación de Conducta y Normas:**
-  - Calificación cualitativa (`Buena`, `Regular`, `Deficiente`) sobre cumplimiento de horario, orden y aseo del puesto.
-
----
-
-### MÓDULO 8: Tablero de Control y Métricas de Impacto Económico
-*Reportes ejecutivos automáticos para la Dirección de Desarrollo Económico Local (DIDEL).*
-
-- **Métricas Consolidadas:**
-  - Total de ventas inyectadas a la economía comunal en cada feria ($ CLP).
-  - Venta promedio por rubro y por puesto.
-  - Tasa de asistencia efectiva vs. inasistencia.
-  - Porcentaje de formalización de los emprendedores que participan en ferias.
-- **Exportación en Formato Estándar:**
-  - Exportación inmediata a planillas Excel/CSV de la nómina completa de participantes con sus ventas y evaluaciones para la rendición municipal.
-
----
-
-### MÓDULO 9: Bitácora Inmutable de Auditoría
-*Resguardo legal y probatorio ante requerimientos de transparencia.*
-
-- **Registro Append-Only (Solo Inserción):**
-  - Toda acción crítica (quién modificó un estado, quién ejecutó el sorteo, quién dio de baja a un postulante) genera un registro inalterable.
-- **Datos Registrados:**
-  - Marca de tiempo exacta (ISO-8601), correo corporativo del funcionario, módulo, acción y diferencial de datos (valores previos y valores nuevos).
-
----
-
-## 4. Reglas de Negocio Esenciales que el Sistema Debe Cumplir
-
-| Regla | Descripción | Justificación |
+| Regla | Implementación en Código | Validación / Control |
 | :--- | :--- | :--- |
-| **RN-01: Cédula Única** | Un ciudadano solo puede existir una vez en el padrón bajo su RUT. | Evita registros duplicados y manipulación de perfiles. |
-| **RN-02: Exigencia Sanitaria** | Rubros de alimentos requieren resolución SEREMI aprobada antes de ser admisibles. | Cumplimiento del Código Sanitario y resguardo de la salud pública. |
-| **RN-03: Auditoría del Azar** | Todo sorteo debe almacenar su semilla criptográfica en base de datos. | Transparencia ante auditorías externas y concejales. |
-| **RN-04: Cero Desperdicio** | Todo cupo desistido debe ofrecerse al primer lugar de la lista de espera. | Uso óptimo de los recursos e inversión municipal en toldos y seguridad. |
-| **RN-05: Soberanía de Datos** | La información reside 100% en Google Workspace sin egreso a terceros. | Cumplimiento de la Ley 19.628 de Protección de Datos Personales. |
+| **RUT Módulo 11** | `ValidacionesChilenas.gs` / `validarRutChileno()` | Multiplicadores 2 a 7, suma ponderada, verificación de dígito verificador (0-9, K). |
+| **Deduplicación SHA-256** | `DriveStorageService.gs` / `calcularHashSha256_()` | Cálculo de hash criptográfico sobre el blob. Si existe en `DOCUMENTOS`, reutiliza URL. |
+| **Atomicidad de Escritura** | `Repository.gs` / `LockService.getScriptLock()` | Bloqueo de hasta 30 segundos en inserciones y actualizaciones sobre Google Sheets. |
+| **Sorteo Reproducible** | `SeleccionService.gs` / `generarSorteoLcg_()` | Registro de `semilla_aleatoria` en `PROCESOS_SELECCION` para verificación de resultados. |
+| **Cascada Inmediata** | `SeleccionService.gs` / `desistirYPromoverCascada()` | Actualización atómica de estados sin alterar el orden del bolillero. |
 
 ---
 
-## 5. Flujogramas Departamentales: Funcionamiento y Procesamiento de Datos (DIDEL)
+## 5. Flujogramas de Operación y Procesamiento de Datos del Sistema
 
-### 5.1 Flujograma de Funcionamiento Operativo de DIDEL (Roles y Circuito Interno)
+### 5.1 Flujograma de Navegación y Operación de Datos por Interfaz
 
-Este diagrama ilustra cómo opera exclusivamente la **Dirección de Desarrollo Económico Local (DIDEL)** en coordinación con los emprendedores y el soporte de Informática durante el ciclo completo de una feria:
+Este diagrama ilustra la secuencia de interacción del usuario con las vistas y controles de la aplicación web:
 
 ```mermaid
 flowchart TD
-    subgraph CIUDADANIA ["1. CIUDADANÍA"]
-        C_POST["Emprendedor(a) Comunal<br/>- Postula a feria en línea<br/>- Adjunta RSH, SII, SEREMI y fotos<br/>- Confirma o desiste de cupo"]
-    end
-
-    subgraph DIDEL ["2. DIRECCIÓN DE DESARROLLO ECONÓMICO LOCAL (DIDEL)"]
-        D_DIR["Jefatura / Dirección DIDEL<br/>- Aprueba apertura de convocatorias<br/>- Monitorea Tablero de Control y métricas de impacto"]
-        D_COORD["Coordinación de Emprendimiento DIDEL<br/>- Parametriza feria, cupos y requisitos<br/>- Monitorea prefiltro automático<br/>- Ejecuta Sorteo LCG con semilla auditable<br/>- Emite y valida nóminas oficiales"]
-        D_EVAL["Equipo Evaluador DIDEL<br/>- Valida vigencia de cartolas en Drive<br/>- Revisa resoluciones sanitarias<br/>- Dictamina ADMISIBLE / INADMISIBLE con fundamento"]
-        D_TERR["Inspectores y Monitores en Terreno DIDEL<br/>- Habilitan y recepcionan stands<br/>- Pasan lista móvil al inicio del día<br/>- Digitan ventas diarias reportadas<br/>- Califican conducta y cumplimiento"]
-    end
-
-    subgraph DIRECCION_INFORMATICA ["3. DIRECCIÓN DE INFORMÁTICA (SOPORTE TI)"]
-        TI_ADMIN["Administrador Google Workspace<br/>- Gestiona accesos y roles institucionales (@muni.cl)<br/>- Resguarda la base relacional en Google Sheets<br/>- Supervisa políticas de seguridad y no egreso (Ley 19.628)<br/>- Programa respaldos automáticos de la planilla"]
-    end
-
-    %% Flujo Operativo Exclusivo DIDEL
-    TI_ADMIN -.->|"Provee plataforma segura y permisos"| DIDEL
-    D_DIR -->|"1. Instruye apertura de convocatoria"| D_COORD
-    D_COORD -->|"2. Publica bases y abre convocatoria"| C_POST
-    C_POST -->|"3. Envía postulación y expediente digital"| D_EVAL
-    D_EVAL -->|"4. Entrega nómina técnica de admisibles"| D_COORD
-    D_COORD -->|"5. Ejecuta sorteo transparente (LCG)"| D_COORD
-    D_COORD -->|"6. Emite nómina de titulares y lista de espera"| C_POST
-    D_COORD -->|"7. Traspasa lista de stands asignados"| D_TERR
-    C_POST -->|"8. Se instala en el stand adjudicado"| D_TERR
-    D_TERR -->|"9. Registra asistencia y ventas diarias"| D_COORD
-    D_COORD -->|"10. Consolida balance y reporte económico final"| D_DIR
+    Start(["Inicio: Usuario abre Web App"]) --> AUTH["Autenticación Google Workspace<br/>(Obtención de email del usuario activo)"]
+    AUTH --> DASH["Pantalla Principal (viewDashboard)<br/>Cálculo y despliegue de KPIs agregados"]
+    
+    %% Navegación por Módulos
+    DASH --> NAV_EMP["1. Módulo Padrón (viewEmprendedores)"]
+    DASH --> NAV_INI["2. Módulo Iniciativas (viewIniciativas)"]
+    DASH --> NAV_POST["3. Módulo Postulaciones (viewPostulaciones)"]
+    DASH --> NAV_SEL["4. Módulo Selección (viewSeleccion)"]
+    DASH --> NAV_SEG["5. Módulo Seguimiento (viewSeguimiento)"]
+    DASH --> NAV_REP["6. Módulo Reportes (viewReportes)"]
+    
+    %% Módulo Padrón
+    NAV_EMP --> FORM_EMP["Abrir modalEmprendedor<br/>Digitar datos y adjuntar archivos"]
+    FORM_EMP --> SAVE_EMP["Clic en 'Guardar Emprendedor'<br/>Normalización de datos e inserción en Sheets"]
+    
+    %% Módulo Iniciativas
+    NAV_INI --> FORM_INI["Abrir modalIniciativa<br/>Configurar cupos y fechas"]
+    FORM_INI --> SAVE_INI["Clic en 'Guardar Iniciativa'<br/>Inserción en tabla INICIATIVAS"]
+    
+    %% Módulo Postulaciones
+    NAV_POST --> SEL_INI_POST["Seleccionar Iniciativa"]
+    SEL_INI_POST --> EVAL_ADM["Visualizar prefiltro y definir estado:<br/>ADMISIBLE o INADMISIBLE"]
+    EVAL_ADM --> SAVE_POST["Actualización en tabla POSTULACIONES"]
+    
+    %% Módulo Selección
+    NAV_SEL --> SEL_INI_DRA["Seleccionar Iniciativa con postulaciones admisibles"]
+    SEL_INI_DRA --> BTN_DRA["Clic en 'Ejecutar Sorteo Aleatorio'"]
+    BTN_DRA --> CALC_LCG["Ejecución LCG con semilla:<br/>Asigna TITULARES y LISTA DE ESPERA"]
+    CALC_LCG --> GRID_DRA["Despliegue de resultados en grilla"]
+    GRID_DRA --> ACT_CUPO{"Acción sobre cupo"}
+    ACT_CUPO -- "Confirmar" --> SAVE_CONF["Estado: CONFIRMADO"]
+    ACT_CUPO -- "Desistir" --> RUN_CASCADE["Estado: DESISTIDO<br/>Promoción automática del #1 de la Lista de Espera"]
+    RUN_CASCADE --> GRID_DRA
+    
+    %% Módulo Seguimiento
+    NAV_SEG --> SEL_INI_SEG["Seleccionar Iniciativa a evaluar"]
+    SEL_INI_SEG --> LOAD_SEG["Carga de participantes confirmados"]
+    LOAD_SEG --> EDIT_SEG["Edición en grilla:<br/>- Asistencia ('SI'/'NO')<br/>- Ventas diarias ($ CLP)<br/>- Calificación y notas"]
+    EDIT_SEG --> BTN_SAVE_SEG["Clic en 'Guardar Seguimiento'<br/>Escritura masiva en Sheets"]
+    
+    %% Módulo Reportes
+    NAV_REP --> BTN_EXP["Clic en 'Exportar CSV/Excel'<br/>Generación en memoria y descarga de archivo"]
 ```
 
 ---
 
-### 5.2 Flujograma del Procesamiento y Ciclo de Datos en DIDEL
+### 5.2 Flujograma del Procesamiento y Ciclo de Datos
 
-Este diagrama muestra la **trazabilidad técnica de los datos** gestionados internamente por DIDEL:
+Este diagrama representa el ciclo de procesamiento técnico desde la captura hasta la salida de datos:
 
 ```mermaid
 flowchart LR
-    subgraph INGESTA ["1. ENTRADA DE DATOS"]
+    subgraph ENTRADA ["1. ENTRADA DE DATOS"]
         direction TB
-        IN_TXT["Datos Alfanuméricos<br/>- RUT Titular<br/>- Teléfono y Email<br/>- Nombre Fantasía<br/>- Tramo % RSH"]
-        IN_DOC["Archivos Binarios<br/>- Cartola RSH (PDF)<br/>- Iniciación SII (PDF)<br/>- Res. Sanitaria (PDF)<br/>- Muestras (JPG/PNG)"]
+        IN_TXT["Datos Alfanuméricos<br/>- RUT, nombres, contactos<br/>- Tramo RSH, iniciación SII<br/>- Fechas y cupos de feria"]
+        IN_BLOB["Archivos Binarios<br/>- Cartola RSH (PDF)<br/>- Res. Sanitaria (PDF)<br/>- Fotos de productos (JPG/PNG)"]
     end
 
-    subgraph DEPURACION ["2. LIMPIEZA Y RESGUARDO"]
+    subgraph PROCESAMIENTO_INICIAL ["2. SANITIZACIÓN Y HASHING"]
         direction TB
-        CLEAN_RUT["Validador Módulo 11<br/>- Corrige formato (12345678-5)<br/>- Bloquea RUT falso"]
-        CLEAN_TEL["Normalizador E.164<br/>- Estandariza a +569..."]
-        HASH_SHA["Motor SHA-256<br/>- Calcula hash único del archivo<br/>- Deduplica y evita almacenamiento redundante"]
+        VAL_RUT["Validador Módulo 11<br/>Formato canónico 12345678-5"]
+        VAL_TEL["Normalizador E.164<br/>Prefijo +569..."]
+        CALC_HASH["Cálculo SHA-256<br/>Detección de duplicados"]
     end
 
-    subgraph NUCLEO_PERSISTENCIA ["3. PERSISTENCIA NATIVA (G-WORKSPACE)"]
+    subgraph PERSISTENCIA ["3. CAPA DE PERSISTENCIA"]
         direction TB
-        DB_SHEETS[("Google Sheets Relacional<br/>(16 Tablas Normalizadas)<br/>- PERSONAS<br/>- EMPRENDIMIENTOS<br/>- POSTULACIONES<br/>- PARTICIPACIONES")]
-        DRIVE_EXP[("Google Drive Institucional<br/>(Expedientes Digitales)<br/>01_Expedientes/[Año]/[RUT]/...")]
+        SHEETS_DB[("Google Sheets (16 Tablas)<br/>Repository.gs con LockService")]
+        DRIVE_FS[("Google Drive Institucional<br/>01_Expedientes/[Año]/[RUT]/...")]
     end
 
-    subgraph MOTOR_DECISION ["4. PROCESAMIENTO Y DECISIÓN"]
+    subgraph ALGORITMOS ["4. MOTORES DE CÁLCULO"]
         direction TB
-        PRE_FILTER{"Prefiltro Normativo<br/>¿RSH <= Umbral?<br/>¿Tiene Res. Sanitaria si vende comida?"}
-        DRAW_LCG["Motor de Sorteo LCG<br/>- Semilla generada<br/>- Separación Titulares / Espera"]
-        CASCADE_ENGINE["Motor de Cascada<br/>- Corrimiento automático por deserciones"]
+        RULE_PRE{"Prefiltro de Admisibilidad<br/>Cruce RSH / Sanitaria"}
+        ALGO_LCG["Sorteo Aleatorio LCG<br/>Semilla criptográfica"]
+        ALGO_CAS["Motor de Cascada<br/>Promoción atómica"]
     end
 
-    subgraph CAPTURA_TERRENO ["5. DATOS DE TERRENO"]
+    subgraph REGISTRO_SEGUIMIENTO ["5. CAPTURA OPERATIVA"]
         direction TB
-        FIELD_DATA["Captura Móvil en Feria<br/>- Asistencia efectiva (SI/NO)<br/>- Ventas diarias ($ CLP)<br/>- Observaciones de inspección"]
+        INPUT_GRID["Registro de Grilla<br/>- Asistencia efectiva<br/>- Ventas por jornada ($ CLP)"]
     end
 
-    subgraph SALIDAS_REPORTABILIDAD ["6. SALIDAS E INTELIGENCIA DIDEL"]
+    subgraph SALIDAS ["6. SALIDAS DEL SISTEMA"]
         direction TB
-        OUT_ACTA["Acta Oficial de Selección DIDEL<br/>(Descargable en Excel/PDF)"]
-        OUT_DASH["Tablero de Control DIDEL<br/>- Monto total transaccionado<br/>- Venta promedio por rubro"]
-        OUT_AUDIT["Bitácora Inmutable (AUDITORIA)<br/>- Registro de trazabilidad y seguridad"]
+        OUT_GRID["Grillas y Vistas en Pantalla"]
+        OUT_CSV["Exportaciones CSV / Excel"]
+        OUT_AUDIT[("Tabla AUDITORIA<br/>(Append-Only Log)")]
     end
 
     %% Conexiones
-    IN_TXT --> CLEAN_RUT & CLEAN_TEL
-    IN_DOC --> HASH_SHA
-    CLEAN_RUT & CLEAN_TEL --> DB_SHEETS
-    HASH_SHA --> DRIVE_EXP
-    DRIVE_EXP -.->|"Índice y URL"| DB_SHEETS
+    IN_TXT --> VAL_RUT & VAL_TEL
+    IN_BLOB --> CALC_HASH
+    VAL_RUT & VAL_TEL --> SHEETS_DB
+    CALC_HASH --> DRIVE_FS
+    DRIVE_FS -.->|"URL y File ID"| SHEETS_DB
 
-    DB_SHEETS --> PRE_FILTER
-    PRE_FILTER -- "Admisibles" --> DRAW_LCG
-    DRAW_LCG --> CASCADE_ENGINE
-    CASCADE_ENGINE --> OUT_ACTA
-    CASCADE_ENGINE --> FIELD_DATA
-    FIELD_DATA --> DB_SHEETS
+    SHEETS_DB --> RULE_PRE
+    RULE_PRE -- "Admisibles" --> ALGO_LCG
+    ALGO_LCG --> ALGO_CAS
+    ALGO_CAS --> INPUT_GRID
+    INPUT_GRID --> SHEETS_DB
 
-    DB_SHEETS --> OUT_DASH
-    DRAW_LCG & CASCADE_ENGINE & FIELD_DATA -.->|"Log transaccional"| OUT_AUDIT
+    SHEETS_DB --> OUT_GRID & OUT_CSV
+    ALGO_LCG & ALGO_CAS & INPUT_GRID -.->|"Registro de evento"| OUT_AUDIT
 ```
-

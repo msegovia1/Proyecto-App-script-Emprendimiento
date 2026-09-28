@@ -842,7 +842,7 @@ function incorporarEmprendedoresAMercadoMasivo(payload) {
 
 /**
  * Seguimiento Masivo: Obtiene los emprendedores participantes de una iniciativa
- * para la grilla de evaluación rápida en terreno.
+ * para la grilla de registro de asistencia y ventas.
  * @param {string} idIniciativa
  * @returns {{ success: boolean, data: any, error: string|null }}
  */

@@ -348,7 +348,7 @@ function cargarDocumentoExpediente(params) {
 
 /**
  * Consulta y retorna el expediente completo de documentos registrados para un emprendedor.
- * Permite al funcionario auditar la documentación y fotos en terreno.
+ * Permite consultar la documentación y archivos registrados en el sistema.
  * @param {string} identificador - RUT, id_persona o id_emprendimiento
  * @returns {{ success: boolean, data: Array<object>, error: string|null }}
  */

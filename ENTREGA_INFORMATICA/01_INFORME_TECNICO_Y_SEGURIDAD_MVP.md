@@ -190,15 +190,15 @@ Nómina oficial de adjudicación generada por el proceso de selección.
 - `fecha_confirmacion`: Fecha en que el emprendedor acepta formalmente el puesto.
 
 ### 10. `PARTICIPACIONES`
-Control operativo de asistencia y cumplimiento durante los días de feria.
+Registro de asistencia y métricas acumuladas de participación por evento.
 - `id_participacion` (PK, UUID v4).
 - `id_iniciativa` (FK -> `INICIATIVAS.id_iniciativa`).
 - `id_emprendimiento` (FK -> `EMPRENDIMIENTOS.id_emprendimiento`).
-- `asistencia_efectiva` (Boolean): Si el titular se presentó a instalar su puesto.
-- `cumplio_normas` (Boolean): Cumplimiento de horarios, aseo y ornato.
-- `ventas_totales_declaradas`: Total acumulado de ingresos declarados por el emprendedor.
-- `evaluacion_terreno`: Calificación emitida por los inspectores comunales (`BUENA`, `REGULAR`, `DEFICIENTE`).
-- `observaciones_inspector`: Pistas de hechos relevantes en terreno.
+- `asistencia_efectiva` (Boolean): Marca de asistencia registrada en la grilla (`true`/`false`).
+- `cumplio_normas` (Boolean): Indicador de cumplimiento de condiciones del evento (`true`/`false`).
+- `ventas_totales_declaradas`: Total acumulado de ingresos registrados en el sistema.
+- `evaluacion_terreno`: Calificación cualitativa registrada en la grilla (`BUENA`, `REGULAR`, `DEFICIENTE`).
+- `observaciones_inspector`: Campo de texto libre para notas registradas en el seguimiento.
 
 ### 11. `SEGUIMIENTO_MERCADO`
 Desglose granular y métricas económicas por jornada de feria.
@@ -213,11 +213,11 @@ Desglose granular y métricas económicas por jornada de feria.
 Bitácora inmutable de seguridad (Append-Only Log) para trazabilidad total.
 - `id_evento` (PK, UUID v4).
 - `timestamp`: Fecha y hora con precisión de milisegundos.
-- `usuario_email`: Correo institucional del funcionario.
+- `usuario_email`: Correo de la cuenta Google Workspace del usuario autenticado.
 - `modulo`: Módulo del sistema involucrado (`SELECCION`, `EMPRENDEDORES`, `EXPEDIENTES`, `CONFIGURACION`).
 - `accion`: Operación ejecutada (`CREAR`, `MODIFICAR`, `EJECUTAR_SORTEO`, `DESISTIR_CUPO`).
 - `entidad_afectada`: Nombre de la tabla y clave primaria afectada.
-- `detalles_json`: Payload con valores anteriores y nuevos valores para auditoría de Contraloría.
+- `detalles_json`: Payload con valores anteriores y nuevos valores para trazabilidad técnica.
 
 ### 13. `CONFIGURACION`
 Parámetros generales de la plataforma y reglas del servicio.
@@ -234,10 +234,10 @@ Consolidado de eventos de años anteriores para análisis longitudinal de subsid
 - `monto_subsidio`: Aporte municipal estimado.
 
 ### 15. `USUARIOS`
-Roles y perfiles de los funcionarios autorizados para interactuar con la plataforma.
+Roles y perfiles de acceso definidos en el sistema.
 - `email` (PK): Correo institucional `@municipalidad.cl`.
-- `nombre_completo`: Nombre del funcionario.
-- `rol`: `ADMIN`, `SUPERVISOR`, `INSPECTOR_TERRENO`, `AUDITOR`.
+- `nombre_completo`: Nombre del usuario del sistema.
+- `rol`: Niveles de permiso (`ADMIN`, `SUPERVISOR`, `OPERADOR`, `AUDITOR`).
 - `activo` (Boolean): Estado de habilitación.
 
 ### 16. `SECTOR_VIRTUAL`
@@ -269,7 +269,7 @@ Si un emprendedor clasificado como `TITULAR_ASIGNADO` desiste o no confirma su c
 1. Su estado se actualiza atómicamente a `DESISTIDO`.
 2. El sistema identifica al postulante en la posición 1 de la `LISTA_ESPERA`.
 3. Se promueve a `TITULAR_ASIGNADO` automáticamente.
-4. Se registra el cambio en la tabla de auditoría con la fecha, funcionario actuante y justificación.
+4. Se registra el cambio en la tabla de auditoría con la fecha, usuario autenticado y justificación.
 
 ---
 

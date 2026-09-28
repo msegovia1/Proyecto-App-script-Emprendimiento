@@ -300,7 +300,7 @@ function apiIncorporarEmprendedoresAMercadoMasivo(payload) {
 }
 
 /**
- * API RPC: Obtiene participantes para evaluación de seguimiento masivo en terreno.
+ * API RPC: Obtiene participantes para la grilla de seguimiento de asistencia y ventas.
  */
 function apiListarParticipantesSeguimiento(idIniciativa) {
   try {

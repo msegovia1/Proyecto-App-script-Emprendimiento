@@ -1,161 +1,163 @@
-# FLUJOGRAMA OPERATIVO DEL PERSONAL MUNICIPAL
-## Proceso de Gestión, Selección y Operación de Mercados de Emprendimiento (SGE v2.1.0)
+# FLUJOGRAMA DE OPERACIÓN DEL SISTEMA Y GESTIÓN DE DATOS
+## Interacción con la Aplicación Web y Flujo de Información (SGE v2.1.0)
 
-> **Documento:** Flujograma Operativo Funcionario  
-> **Destinatario:** Dirección de Informática / Dirección de Desarrollo Económico Local (DIDEL)  
+> **Documento:** Flujograma Operativo del Sistema  
+> **Destinatario:** Dirección de Informática  
+> **Alcance:** Exclusivamente las interfaces, eventos de usuario y operaciones de datos implementadas en el sistema.  
 > **Herramienta de Diagramación:** Mermaid GFM Compliant  
 
 ---
 
-## 1. Visión General del Proceso Operativo
+## 1. Módulos Operativos de la Aplicación Web
 
-El trabajo de los funcionarios municipales en el SGE se articula en **6 etapas consecutivas**, orientadas a maximizar la eficiencia administrativa, eliminar la discrecionalidad y asegurar la transparencia total en la asignación de espacios públicos de comercialización:
+El sistema implementa **6 interfaces operativas** interconectadas que gestionan el ciclo completo de los datos:
 
 ```mermaid
 flowchart LR
-    E1["1. Parametrización de Convocatoria"] --> E2["2. Recepción y Prefiltro"]
-    E2 --> E3["3. Evaluación de Admisibilidad"]
-    E3 --> E4["4. Sorteo Transparente LCG"]
-    E4 --> E5["5. Confirmación y Cascada"]
-    E5 --> E6["6. Operación en Terreno y Ventas"]
+    M1["1. Ficha Integral y Padrón<br/>(viewEmprendedores)"] --> M2["2. Gestión de Iniciativas<br/>(viewIniciativas)"]
+    M2 --> M3["3. Gestión de Postulaciones<br/>(viewPostulaciones)"]
+    M3 --> M4["4. Selección Aleatoria LCG<br/>(viewSeleccion)"]
+    M4 --> M5["5. Grilla de Seguimiento<br/>(viewSeguimiento)"]
+    M5 --> M6["6. Tablero y Reportes<br/>(viewDashboard / viewReportes)"]
 ```
 
 ---
 
-## 2. Diagrama de Flujo Integral (BPMN Funcionario)
+## 2. Diagrama de Flujo de Operación y Eventos del Sistema
 
-A continuación se detalla el flujo de trabajo completo que realizan los funcionarios desde la creación del mercado hasta la auditoría de ventas en terreno:
+Este diagrama detalla las acciones del usuario en pantalla y los procesos de datos disparados en el backend:
 
 ```mermaid
 flowchart TD
-    Start(["Inicio: Planificación del Mercado"]) --> F1["Funcionario: Crear Iniciativa en SGE"]
-    F1 --> F2["Definir Parámetros del Mercado:<br/>- Cupos totales y por rubro<br/>- Fechas de evento y plazo postulación<br/>- Requisitos excluyentes (RSH, SII, SEREMI)"]
-    F2 --> F3["Publicar Convocatoria a la Comunidad"]
+    Start(["Inicio: Usuario accede a la Web App"]) --> LOGIN["Autenticación Automática Google Workspace<br/>(Session.getActiveUser().getEmail())"]
+    LOGIN --> DASH["Carga de Vista Principal (viewDashboard)<br/>apiCargarDashboardCompleto()"]
     
-    F3 --> P1["Postulación Ciudadana<br/>(Google Forms / Ventanilla SGE)"]
-    P1 --> P2["Ingesta Automática de Datos y Expediente"]
+    %% Módulo 1: Padrón y Ficha Integral
+    DASH --> NAV1["Navegar a Padrón (viewEmprendedores)"]
+    NAV1 --> EMP_ACT{"Acción en Padrón"}
+    EMP_ACT -- "Crear / Editar" --> MODAL_EMP["Abrir modalEmprendedor<br/>Formulario Persona + Negocio"]
+    MODAL_EMP --> SAVE_EMP["Clic en 'Guardar Emprendedor'<br/>apiGuardarFichaIntegral()"]
+    SAVE_EMP --> DB_EMP["Inserción/Actualización en Sheets:<br/>PERSONAS, EMPRENDIMIENTOS"]
     
-    P2 --> PF1{"Ejecución de Prefiltro Automático"}
-    PF1 -- "No cumple requisitos críticos<br/>(RSH sobre umbral, sin resolución en comida)" --> PF_RECHAZO["Estado: Inadmisible Automático<br/>(Se registra causal objetiva)"]
-    PF1 -- "Cumple requisitos base" --> PF_OK["Estado: Postulación Admisible Previa"]
+    EMP_ACT -- "Ver Documentos" --> MODAL_DOC["Abrir modalDocumentos<br/>apiListarDocumentosEmprendedor()"]
+    MODAL_DOC --> VIEW_DOC["Visualizar lista con enlaces a Drive<br/>Subir nuevo archivo con hash SHA-256"]
     
-    PF_OK --> EV1["Funcionario Revisor:<br/>Abrir Módulo de Admisibilidad"]
-    EV1 --> EV2["Auditar Expediente en Google Drive:<br/>- Verificar Cartola RSH vigente<br/>- Constatar Resolución Sanitaria si aplica<br/>- Revisar fotos de productos elaborados"]
+    %% Módulo 2: Iniciativas
+    DASH --> NAV2["Navegar a Iniciativas (viewIniciativas)"]
+    NAV2 --> MODAL_INI["Abrir modalIniciativa<br/>Definir cupos, fechas y requisitos"]
+    MODAL_INI --> SAVE_INI["Clic en 'Guardar Iniciativa'<br/>apiIniciativaGuardar()"]
+    SAVE_INI --> DB_INI["Persistencia en tabla INICIATIVAS"]
     
-    EV2 --> EV3{"Dictamen del Funcionario"}
-    EV3 -- "Inconsistencia / Falsedad" --> EV_RECHAZADO["Marcar: INADMISIBLE<br/>(Ingresar fundamento en acta)"]
-    EV3 -- "Documentación Fidedigna" --> EV_APROBADO["Marcar: ADMISIBLE FINAL<br/>(Habilitado para Sorteo)"]
+    %% Módulo 3: Postulaciones
+    DASH --> NAV3["Navegar a Postulaciones (viewPostulaciones)"]
+    NAV3 --> LIST_POST["Cargar lista por iniciativa<br/>apiPostulacionesPorIniciativa()"]
+    LIST_POST --> EVAL_POST{"Acción sobre Postulación"}
+    EVAL_POST -- "Cambiar Estado" --> SET_ESTADO["Seleccionar ADMISIBLE / INADMISIBLE<br/>apiPostulacionCambiarEstado()"]
+    SET_ESTADO --> DB_POST["Actualización de estado en POSTULACIONES"]
     
-    EV_APROBADO --> S1["Cierre de Plazo de Convocatoria"]
-    S1 --> S2["Funcionario Coordinador:<br/>Abrir Módulo de Sorteo LCG"]
-    S2 --> S3["Generar Semilla Criptográfica Auditable"]
-    S3 --> S4["Ejecutar Algoritmo LCG de Asignación"]
+    %% Módulo 4: Selección LCG
+    DASH --> NAV4["Navegar a Selección (viewSeleccion)"]
+    NAV4 --> SEL_INI["Seleccionar Iniciativa con estado ADMISIBLE"]
+    SEL_INI --> BTN_SORTEO["Clic en 'Ejecutar Sorteo Aleatorio'<br/>apiEjecutarSorteo()"]
+    BTN_SORTEO --> PROC_LCG["Backend SeleccionService.gs:<br/>1. Genera semilla numérica LCG<br/>2. Ordena postulantes de forma pseudoaleatoria<br/>3. Asigna TITULARES (cupo 1 a N)<br/>4. Asigna LISTA DE ESPERA (N+1 a M)"]
+    PROC_LCG --> DB_SEL["Registro en PROCESOS_SELECCION<br/>y RESULTADOS_SELECCION"]
+    DB_SEL --> RENDER_RES["Renderizar grilla de resultados en pantalla"]
     
-    S4 --> S5["Emisión de Resultados Oficiales:<br/>- Titulares Asignados (Cupo 1 a N)<br/>- Lista de Espera Ordenada (N+1 a M)"]
-    S5 --> S6["Publicación de Acta con Semilla de Auditoría"]
+    RENDER_RES --> ACC_CUPO{"Acción sobre Cupo"}
+    ACC_CUPO -- "Confirmar" --> CONF_CUPO["Clic en 'Confirmar'<br/>apiConfirmarCupo() -> Estado: CONFIRMADO"]
+    ACC_CUPO -- "Desistir" --> DES_CUPO["Clic en 'Desistir'<br/>apiDesistirCupo() -> Estado: DESISTIDO"]
+    DES_CUPO --> CASCADE["DISPARO AUTOMÁTICO DE CASCADA:<br/>Backend promueve al primer postulante de<br/>LISTA_ESPERA a TITULAR_ASIGNADO"]
+    CASCADE --> RENDER_RES
     
-    S6 --> C1["Notificar a Postulantes Seleccionados"]
-    C1 --> C2["Plazo de Confirmación de Cupo (48-72 hrs)"]
+    %% Módulo 5: Seguimiento y Ventas
+    DASH --> NAV5["Navegar a Seguimiento (viewSeguimiento)"]
+    NAV5 --> LOAD_GRID["Seleccionar Iniciativa<br/>apiListarParticipantesSeguimiento()"]
+    LOAD_GRID --> RENDER_GRID["Desplegar tabla de participantes y columnas por día"]
+    RENDER_GRID --> INPUT_DATA["Usuario digita en grilla:<br/>- Asistencia ('SI' / 'NO')<br/>- Venta por cada día ($ CLP)<br/>- Calificación y observación"]
+    INPUT_DATA --> BTN_SAVE_SEG["Clic en 'Guardar Seguimiento'<br/>apiGuardarSeguimientoMasivo()"]
+    BTN_SAVE_SEG --> DB_SEG["Guardado masivo en Sheets:<br/>SEGUIMIENTO_MERCADO y PARTICIPACIONES"]
     
-    C2 --> C3{"¿El Emprendedor Confirma?"}
-    C3 -- "SÍ: Confirma Asistencia" --> C4["Estado: CONFIRMADO<br/>Asignar Número de Stand / Toldo"]
-    C3 -- "NO: Desiste o Vence Plazo" --> C5["Estado: DESISTIDO"]
-    
-    C5 --> CASCADA["ALGORITMO DE CASCADA:<br/>1. Tomar Postulante #1 de Lista de Espera<br/>2. Promoverlo automáticamente a TITULAR<br/>3. Enviar Citación con plazo perentorio"]
-    CASCADA --> C3
-    
-    C4 --> T1["Día del Evento: Inspectores en Terreno"]
-    T1 --> T2["Pase de Asistencia Digital en Tablet/Celular"]
-    T2 --> T3{"¿Titular se Presentó?"}
-    T3 -- "SÍ" --> T4["Confirmar Instalación Efectiva"]
-    T3 -- "NO (Falta Injustificada)" --> T5["Registrar Inasistencia:<br/>Sanción reglamentaria en historial"]
-    
-    T4 --> T6["Supervisión Diaria en Feria"]
-    T6 --> T7["Módulo de Seguimiento Masivo:<br/>Digitar ventas diarias declaradas ($ CLP)"]
-    T7 --> T8["Evaluar Desempeño y Cumplimiento de Normas"]
-    
-    T8 --> FIN(["Cierre de Iniciativa y Balance Económico DIDEL"])
-    PF_RECHAZO --> FIN_RECHAZO(["Notificación de Inadmisibilidad al Ciudadano"])
-    EV_RECHAZADO --> FIN_RECHAZO
+    %% Módulo 6: Dashboard y Reportes
+    DASH --> NAV6["Navegar a Reportes (viewReportes)"]
+    NAV6 --> EXP_DATA{"Opciones de Exportación"}
+    EXP_DATA -- "Reporte Feria" --> CSV_MKT["apiListarParticipantesSeguimiento()<br/>Descarga directa archivo CSV/Excel"]
+    EXP_DATA -- "Padrón Total" --> CSV_PAD["apiFichasListar()<br/>Descarga padrón comunal CSV/Excel"]
 ```
 
 ---
 
-## 3. Matriz de Responsabilidades por Rol de Funcionario
+## 3. Diagrama de Secuencia de Interacción de Datos
+
+Este diagrama representa el intercambio técnico de mensajes entre el usuario en el navegador y los servicios de almacenamiento:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor C as Ciudadano / Emprendedor
-    actor A as Administrador / Coordinador
-    actor R as Funcionario Evaluador
-    actor I as Inspector en Terreno
-    participant S as Plataforma SGE (Google Workspace)
+    actor U as Usuario de la Web App
+    participant UI as Frontend (HTML / JS)
+    participant RPC as WebApp.gs (Controlador RPC)
+    participant Svc as Servicios Backend (.gs)
+    participant DB as Google Sheets (Repository.gs)
+    participant Drive as Google Drive
 
-    Note over A, S: FASE 1: Convocatoria y Reglas
-    A->>S: Crea mercado y parametriza cupos y requisitos
-    S-->>C: Publica ficha de postulación
+    %% Caso 1: Carga y Consulta
+    Note over U, DB: 1. Carga de Ficha Integral y Expediente
+    U->>UI: Abre modal de documentos del emprendedor
+    UI->>RPC: google.script.run.apiListarDocumentosEmprendedor(id)
+    RPC->>Svc: DriveStorageService.obtenerDocumentosEmprendedor(id)
+    Svc->>DB: repoBuscar('DOCUMENTOS', { id_emprendimiento })
+    DB-->>Svc: Retorna registros (drive_file_id, sha256_hash, url)
+    Svc-->>UI: Retorna JSON con lista de documentos
+    UI-->>U: Renderiza lista de archivos con enlaces directos a Drive
 
-    Note over C, S: FASE 2: Postulación y Prefiltro
-    C->>S: Envía formulario y sube documentos a Drive
-    S->>S: Ejecuta prefiltro automático (RUT, RSH, Rubro)
+    %% Caso 2: Sorteo y Selección
+    Note over U, DB: 2. Ejecución del Sorteo LCG y Asignación
+    U->>UI: Presiona botón 'Ejecutar Sorteo' en viewSeleccion
+    UI->>RPC: google.script.run.apiEjecutarSorteo(idIniciativa)
+    RPC->>Svc: SeleccionService.ejecutarProcesoSeleccion(idIniciativa)
+    Svc->>DB: repoBuscar('POSTULACIONES', { id_iniciativa, estado: 'ADMISIBLE' })
+    DB-->>Svc: Universo de postulaciones admisibles
+    Note over Svc: Ejecuta algoritmo LCG con semilla criptográfica<br/>Divide en Titulares y Lista de Espera
+    Svc->>DB: repoInsertar('PROCESOS_SELECCION', proceso)
+    Svc->>DB: repoInsertarLote('RESULTADOS_SELECCION', resultados)
+    Svc->>DB: repoInsertar('AUDITORIA', eventoAuditoria)
+    Svc-->>UI: Retorna resumen de selección ({ success: true, titulares, espera })
+    UI-->>U: Muestra grilla ordenada de asignación
 
-    Note over R, S: FASE 3: Evaluación de Expedientes
-    R->>S: Accede a postulaciones pendientes
-    R->>S: Revisa archivos en Google Drive
-    R->>S: Dictamina ADMISIBLE o INADMISIBLE con fundamento
+    %% Caso 3: Desistimiento y Reemplazo en Cascada
+    Note over U, DB: 3. Registro de Desistimiento y Cascada
+    U->>UI: Clic en botón 'Desistir' sobre un titular
+    UI->>RPC: google.script.run.apiDesistirCupo(idResultado)
+    RPC->>Svc: SeleccionService.desistirYPromoverCascada(idResultado)
+    Svc->>DB: repoActualizar('RESULTADOS_SELECCION', idResultado, { estado: 'DESISTIDO' })
+    Svc->>DB: Obtiene primer registro de 'LISTA_ESPERA'
+    Svc->>DB: repoActualizar('RESULTADOS_SELECCION', idSiguiente, { estado: 'TITULAR_ASIGNADO' })
+    Svc->>DB: repoInsertar('AUDITORIA', logCascada)
+    Svc-->>UI: Retorna confirmación de reemplazo
+    UI-->>U: Actualiza dinámicamente la grilla en pantalla
 
-    Note over A, S: FASE 4: Sorteo y Asignación
-    A->>S: Dispara proceso de selección aleatoria (LCG)
-    S->>S: Genera semilla y ordena universo de postulantes
-    S-->>A: Entrega nómina de Titulares y Lista de Espera
-
-    Note over C, S: FASE 5: Confirmación y Cascada
-    S-->>C: Notifica adjudicación de puesto
-    alt Emprendedor confirma
-        C->>S: Acepta puesto
-        S->>S: Fija estado CONFIRMADO
-    else Emprendedor desiste
-        C->>S: Declina o expira plazo
-        S->>S: Marca DESISTIDO y promueve en cascada a Lista de Espera
-    end
-
-    Note over I, S: FASE 6: Control de Terreno y Ventas
-    I->>S: Realiza pase de lista en terreno
-    I->>S: Registra ventas del día y evaluación
-    S->>S: Consolida métricas de impacto económico
+    %% Caso 4: Registro de Seguimiento Masivo
+    Note over U, DB: 4. Guardado de Asistencia y Ventas
+    U->>UI: Ingresa valores de ventas y asistencia en viewSeguimiento y presiona 'Guardar'
+    UI->>RPC: google.script.run.apiGuardarSeguimientoMasivo(payload)
+    RPC->>Svc: MercadosService.guardarSeguimientoMasivo(payload)
+    Svc->>DB: LockService.getScriptLock().waitLock(30000)
+    Svc->>DB: Actualiza PARTICIPACIONES y SEGUIMIENTO_MERCADO
+    Svc->>DB: LockService.releaseLock()
+    Svc-->>UI: Retorna { success: true, filasGuardadas }
+    UI-->>U: Muestra notificación de éxito (Toast)
 ```
 
 ---
 
-## 4. Descripción Operativa de las 6 Fases
+## 4. Resumen de Entradas, Procesamiento y Salidas por Módulo
 
-### Fase 1: Parametrización y Convocatoria
-- **Actor:** Coordinador de Fomento Productivo.
-- **Acción:** Define la fecha de apertura, cierre, número de puestos disponibles y criterios de exclusión.
-- **Ventaja SGE:** Evita la creación de planillas manuales desconectadas; toda la parametrización se almacena en la tabla `INICIATIVAS` y `REQUISITOS`.
-
-### Fase 2: Prefiltro y Control Antifraude
-- **Actor:** Sistema automatizado SGE.
-- **Acción:** Valida que el RUT sea matemáticamente correcto (Módulo 11), verifica que no existan postulaciones duplicadas del mismo titular o emprendimiento, y constata que el rubro postulado coincida con la vocación de la feria.
-- **Ventaja SGE:** Reduce en más de un 60% la carga de trabajo manual del equipo evaluador.
-
-### Fase 3: Evaluación Técnica de Expedientes
-- **Actor:** Funcionarios Evaluadores.
-- **Acción:** Acceden al visualizador de expedientes que conecta directamente con la carpeta de Google Drive institucional del emprendedor. Verifican la vigencia de la Cartola RSH y la Resolución Sanitaria.
-- **Ventaja SGE:** Trazabilidad total de quién aprobó o rechazó cada postulación, registrando nombre de funcionario, fecha y motivo en la tabla `POSTULACIONES`.
-
-### Fase 4: Sorteo Digital Transparente (LCG)
-- **Actor:** Coordinador de Fomento / Notario Municipal / Ministro de Fe.
-- **Acción:** Con un solo clic, se ejecuta el sorteo con una semilla matemática inmutable. El sistema genera la lista de titulares y la lista de espera ordenada.
-- **Ventaja SGE:** Transparencia absoluta ante cualquier requerimiento de revisión. El proceso es 100% reproducible y auditable internamente.
-
-### Fase 5: Confirmación de Puestos y Algoritmo de Cascada
-- **Actor:** Funcionarios Administrativos.
-- **Acción:** Controlan la recepción de confirmaciones. Si un adjudicatario no se contacta o no asiste a la inducción obligatoria, el sistema realiza la promoción en cascada del primer postulante de la lista de espera sin alterar el orden original.
-- **Ventaja SGE:** Ningún cupo municipal queda ocioso ni se asigna por favoritismo.
-
-### Fase 6: Operación en Terreno y Seguimiento Económico
-- **Actor:** Inspectores y Técnicos en Terreno.
-- **Acción:** Utilizan tablets o teléfonos móviles para pasar lista al inicio de la jornada. Al cierre del día, registran las ventas brutas declaradas de cada puesto en el módulo de seguimiento masivo.
-- **Ventaja SGE:** Permite generar reportes inmediatos para la gestión de DIDEL con el impacto económico real, total de ventas inyectadas a la economía local y tasa de asistencia efectiva.
+| Módulo de la Web App | Datos de Entrada (Usuario) | Procesamiento Interno del Software | Datos de Salida (Pantalla / Archivo) |
+| :--- | :--- | :--- | :--- |
+| **`viewDashboard`** | Clic de navegación o selección de período. | Cálculo en memoria de KPIs agregados (ventas totales, porcentaje de asistencia, formalización). | Gráficos visuales de barras y tarjetas métricas con valores acumulados. |
+| **`viewEmprendedores`** | RUT, nombres, rubro, contacto, cartola RSH, fotos. | Validación Módulo 11, normalización E.164, cálculo de hash SHA-256 para archivos. | Ficha integral persistida en `PERSONAS` y `EMPRENDIMIENTOS`, expediente en Drive. |
+| **`viewIniciativas`** | Nombre de mercado, cupos totales, fechas de inicio y fin. | Asignación de UUID, validación de coherencia de fechas, estado inicial `BORRADOR`. | Registro creado en tabla `INICIATIVAS` y habilitado para postulaciones. |
+| **`viewPostulaciones`** | Selección de iniciativa, clic en `ADMISIBLE` o `INADMISIBLE`. | Verificación de requisitos excluyentes, asignación de causal de rechazo si aplica. | Registro actualizado en `POSTULACIONES` con trazabilidad del cambio. |
+| **`viewSeleccion`** | Clic en `Ejecutar Sorteo`, o clics en `Confirmar` / `Desistir`. | Ejecución del algoritmo pseudoaleatorio LCG con semilla. En caso de desistir, activación del corrimiento en cascada. | Tablas clasificadas de `TITULARES` y `LISTA DE ESPERA` con registro inmutable en auditoría. |
+| **`viewSeguimiento`** | Selector de iniciativa, marcas de asistencia ('SI'/'NO'), montos diarios ($ CLP), observaciones. | Bloqueo concurrente con `LockService`, cálculo de ventas totales acumuladas por participante. | Filas persistidas en `PARTICIPACIONES` y desglose diario en `SEGUIMIENTO_MERCADO`. |
+| **`viewReportes`** | Clic en botón `Exportar Reporte de Mercado` o `Exportar Padrón`. | Lectura masiva desde Sheets, formateo a estructura de columnas CSV/Excel. | Descarga automática en el navegador de archivo `.csv` con cabeceras estándar. |
