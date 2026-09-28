@@ -1,0 +1,472 @@
+// ===== WebApp.gs =====
+// SGE v2.1.0 - Ficha integral del emprendedor
+// Punto de entrada HTML5, resolución de plantillas y bootstrapping del frontend
+
+/**
+ * Punto de entrada HTTP GET para la aplicación web de Google Apps Script.
+ */
+function doGet() {
+  const candidates = ['Index', 'src/frontend/Index', 'frontend/Index'];
+  let template = null;
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      template = HtmlService.createTemplateFromFile(candidates[i]);
+      if (template) break;
+    } catch (ignored) {}
+  }
+  if (!template) template = HtmlService.createTemplateFromFile('Index');
+  template.appName = APP.NAME;
+  template.version = APP.VERSION;
+  return template.evaluate()
+    .setTitle(APP.NAME)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+
+function include_(filename) {
+  const candidates = [
+    filename,
+    'src/frontend/' + filename,
+    'frontend/' + filename
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      return HtmlService.createHtmlOutputFromFile(candidates[i]).getContent();
+    } catch (ignored) {}
+  }
+  return '';
+}
+
+/**
+ * API RPC: Inicializa la aplicación en el cliente con datos de usuario, permisos, catálogos y dashboard.
+ */
+function apiBootstrap() {
+  try {
+    const user = usuarioActual_();
+    let dashboard = null;
+    if (puede_('REPORTE_VER')) {
+      const dbResp = apiDashboardIntegral(false);
+      if (dbResp.ok) dashboard = dbResp.data;
+    }
+    const props = PropertiesService.getScriptProperties();
+    const formUrl = props ? props.getProperty(APP.PROP_FORM_URL) || '' : '';
+    return respuestaOk({
+      app: { name: APP.NAME, version: APP.VERSION },
+      usuario: user,
+      permisos: PERMISOS_ROL[user.ROL] || [],
+      catalogos: catalogos_(),
+      dashboard: dashboard,
+      formularioRegistroUrl: formUrl,
+      explicacionOperadores: EXPLICACION_OPERADORES
+    });
+  } catch (error) {
+    return manejarError_(error, 'apiBootstrap');
+  }
+}
+
+/**
+ * API RPC genérica para listar entidades permitidas.
+ */
+function apiListar(tabla, filtros) {
+  try {
+    usuarioActual_();
+    const permitidas = ['INICIATIVAS', 'POSTULACIONES', 'PARTICIPACIONES', 'BENEFICIOS', 'ATENCIONES'];
+    exigir_(permitidas.indexOf(tabla) >= 0, 'TABLA_NO_PUBLICADA', tabla);
+    return respuestaOk(repoListar(tabla, { filtro: filtros || {}, limit: APP.PAGE_SIZE }));
+  } catch (error) {
+    return manejarError_(error, 'apiListar');
+  }
+}
+
+/**
+ * API RPC: Valida un RUT chileno en tiempo real con algoritmo Módulo 11.
+ */
+function apiValidarRut(rut) {
+  return validarRutChileno(rut);
+}
+
+
+/**
+ * API RPC: Guarda o actualiza un emprendedor y su negocio con validaciones chilenas.
+ */
+function apiFichaGuardar(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return guardarFichaEmprendedor(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Consulta la ficha integral de un emprendedor por RUT o ID.
+ */
+function apiFichaDetalle(rutOId) {
+  try {
+    return obtenerFichaIntegral(rutOId);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Lista emprendedores con filtros de búsqueda y rubro.
+ */
+function apiFichasListar(filtros) {
+  try {
+    return listarFichasEmprendedores(filtros || {});
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Sube un archivo a Google Drive y registra en Google Sheets.
+ */
+function apiExpedienteCargar(params) {
+  try {
+    const user = usuarioActual_();
+    if (params) params.usuarioEmail = user.EMAIL;
+    return cargarDocumentoExpediente(params);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Lista iniciativas y ferias comunales.
+ */
+function apiIniciativasListar(filtros) {
+  try {
+    return listarIniciativas(filtros);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Crea una nueva iniciativa/feria.
+ */
+function apiIniciativaCrear(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return crearIniciativa(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Actualiza una iniciativa o mercado existente.
+ */
+function apiIniciativaActualizar(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return actualizarIniciativa(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Registra una postulación.
+ */
+function apiPostulacionRegistrar(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return registrarPostulacion(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Evalúa admisibilidad contra criterios paramétricos.
+ */
+function apiAdmisibilidadEvaluar(idIniciativa) {
+  try {
+    const user = usuarioActual_();
+    return evaluarAdmisibilidadIniciativa(idIniciativa, user.EMAIL);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Ejecuta el sorteo pseudoaleatorio determinista LCG con semilla.
+ */
+function apiSeleccionEjecutar(params) {
+  try {
+    const user = usuarioActual_();
+    if (params) params.ejecutorEmail = user.EMAIL;
+    return ejecutarSeleccionTransparente(params);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Gestiona confirmación o desistimiento con reasignación en cascada.
+ */
+function apiConfirmacionGestionar(params) {
+  try {
+    const user = usuarioActual_();
+    if (params) params.usuarioEmail = user.EMAIL;
+    return gestionarConfirmacionTitular(params);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Guarda métricas de seguimiento post-mercado.
+ */
+function apiSeguimientoPostMercadoGuardar(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return guardarSeguimientoPostMercado(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene el Dashboard Ejecutivo consolidado con métricas en vivo.
+ */
+function apiDashboardConsolidado() {
+  try {
+    return obtenerDashboardConsolidado();
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene las postulaciones de un mercado para selección por funcionarios (Camino 1).
+ */
+function apiListarPostulacionesMercado(idIniciativa) {
+  try {
+    try {
+      if (typeof apiProcesarRespuestasPendientesFormulario === 'function') {
+        apiProcesarRespuestasPendientesFormulario();
+      }
+    } catch (ignored) {}
+    return obtenerPostulacionesMercado(idIniciativa);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Actualiza masivamente el estado de postulaciones (Titular, Suplente, Rechazada, Admisible).
+ */
+function apiActualizarEstadoPostulacionesMasivo(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return actualizarEstadoPostulacionesMasivo(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene los emprendedores registrados en el padrón comunal disponibles para ferias (Camino 2).
+ */
+function apiListarEmprendedoresDisponibles(filtro) {
+  try {
+    return obtenerEmprendedoresDisponibles(filtro);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Incorpora masivamente emprendedores de la base comunal a una feria del año.
+ */
+function apiIncorporarEmprendedoresAMercadoMasivo(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return incorporarEmprendedoresAMercadoMasivo(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene participantes para la grilla de seguimiento de asistencia y ventas.
+ */
+function apiListarParticipantesSeguimiento(idIniciativa) {
+  try {
+    return obtenerParticipantesSeguimiento(idIniciativa);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Guarda masivamente el seguimiento e impacto post-mercado.
+ */
+function apiGuardarSeguimientoMasivo(payload) {
+  try {
+    const user = usuarioActual_();
+    if (payload) payload.usuarioEmail = user.EMAIL;
+    return guardarSeguimientoMasivo(payload);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene el listado de documentos digitales y fotos de un emprendedor para revisión de funcionarios.
+ */
+function apiListarDocumentosEmprendedor(identificador) {
+  try {
+    return obtenerDocumentosEmprendedor(identificador);
+  } catch (error) {
+    return { success: false, data: [], error: error.message };
+  }
+}
+
+/**
+ * API RPC: Obtiene el resumen comparativo de ventas por jornada/día de una feria.
+ */
+function apiObtenerResumenVentasPorDia(idIniciativa) {
+  try {
+    return obtenerResumenVentasPorDia(idIniciativa);
+  } catch (error) {
+    return { success: false, data: null, error: error.message };
+  }
+}
+
+/**
+ * API RPC: Sincroniza las convocatorias abiertas en el Formulario Único Oficial de Postulaciones (en Mi Unidad)
+ * y procesa automáticamente cualquier postulación pendiente para sincronizarla en Google Sheets y Drive.
+ */
+function apiSincronizarFormularioOficial() {
+  try {
+    const res = sincronizarMercadosEnFormularioUnico_();
+    if (!res) {
+      return { success: false, data: null, error: 'No se pudo inicializar o sincronizar el formulario único.' };
+    }
+    // Ingesta automática de postulaciones pendientes o existentes
+    let ingesta = null;
+    try {
+      if (typeof apiProcesarRespuestasPendientesFormulario === 'function') {
+        ingesta = apiProcesarRespuestasPendientesFormulario();
+      }
+    } catch (errIngesta) {
+      Logger.log('Aviso en ingesta automática de respuestas: ' + errIngesta.message);
+    }
+    res.ingesta = ingesta ? ingesta.data : null;
+
+    // Normalizar nombres de carpetas en Google Drive a formato institucional completo
+    try {
+      if (typeof driveNormalizarNombresCarpetasExistentes === 'function') {
+        driveNormalizarNombresCarpetasExistentes();
+      }
+    } catch (errDrive) {
+      Logger.log('Aviso al normalizar nombres de carpetas: ' + errDrive.message);
+    }
+
+    return { success: true, ok: true, data: serializarParaCliente_(res), error: null };
+  } catch (error) {
+    return { success: false, ok: false, data: null, error: error.message || String(error) };
+  }
+}
+
+/**
+ * API RPC: Normaliza nombres de carpetas en Google Drive para incluir RUT formateado y nombres
+ */
+function apiNormalizarCarpetasDrive() {
+  try {
+    return driveNormalizarNombresCarpetasExistentes();
+  } catch (error) {
+    return { success: false, renombradas: [], error: error.message };
+  }
+}
+
+/**
+ * API RPC: Procesa manualmente respuestas pendientes del formulario oficial
+ */
+function apiProcesarRespuestasPendientes() {
+  return apiProcesarRespuestasPendientesFormulario();
+}
+
+
+/**
+ * API RPC: Consulta el estado del Formulario Único Oficial de Postulaciones y su carpeta en Mi Unidad.
+ */
+function apiObtenerEstadoFormularioOficial() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const formUrl = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_URL) || '';
+    const formId = props.getProperty(APP.PROP_FORM_MERCADO_UNICO_ID) || '';
+    
+    // Obtener la carpeta raíz de la Unidad Compartida
+    let carpetaCompartida = null;
+    try {
+      carpetaCompartida = carpetaRoot_();
+    } catch (e) {}
+    
+    const carpetaMiUnidad = carpetaFormulariosPublicos_();
+    const urlCompartida = carpetaCompartida ? carpetaCompartida.getUrl() : 'https://drive.google.com/drive/folders/1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
+    
+    return {
+      success: true,
+      data: {
+        formId: formId,
+        formUrl: formUrl,
+        carpetaNombre: carpetaCompartida ? carpetaCompartida.getName() : 'DIDEL - Sistema de Gestión de Emprendimientos',
+        carpetaUrl: urlCompartida,
+        carpetaId: carpetaCompartida ? carpetaCompartida.getId() : '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm',
+        carpetaMiUnidadUrl: carpetaMiUnidad ? carpetaMiUnidad.getUrl() : ''
+      },
+      error: null
+    };
+  } catch (error) {
+    return { success: false, data: null, error: error.message || String(error) };
+  }
+}
+
+/**
+ * API RPC: Configura una carpeta personalizada en Mi Unidad para alojar formularios públicos y cargas.
+ */
+function apiConfigurarCarpetaMiUnidadFormulario(payload) {
+  try {
+    if (!payload || !payload.folderId) {
+      return { success: false, data: null, error: 'Debe ingresar el ID de la carpeta.' };
+    }
+    const folder = DriveApp.getFolderById(payload.folderId);
+    PropertiesService.getScriptProperties().setProperty('DRIVE_MI_UNIDAD_FORM_FOLDER_ID', folder.getId());
+    return {
+      success: true,
+      data: {
+        id: folder.getId(),
+        nombre: folder.getName(),
+        url: folder.getUrl()
+      },
+      error: null
+    };
+  } catch (error) {
+    return { success: false, data: null, error: 'No se pudo acceder a la carpeta: ' + error.message };
+  }
+}
+
+/**
+ * API RPC: Configura y crea la estructura limpia en la Unidad Compartida oficial (DIDEL).
+ */
+function apiConfigurarUnidadCompartida(payload) {
+  try {
+    const fid = (payload && payload.folderId) ? payload.folderId : '1aEUoXqcUTHLQ1URiTIQ2DZWF3xJ-5zvm';
+    return configurarUnidadCompartidaOficial(fid);
+  } catch (error) {
+    return { success: false, data: null, error: 'Error al configurar Unidad Compartida: ' + error.message };
+  }
+}
